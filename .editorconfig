@@ -41,6 +41,7 @@ dotnet_naming_rule.private_static_readonly_rule.severity = warning
 dotnet_naming_rule.private_static_readonly_rule.style = upper_camel_case_style
 dotnet_naming_rule.private_static_readonly_rule.symbols = private_static_readonly_symbols
 dotnet_naming_style.lower_camel_case_style.capitalization = camel_case
+dotnet_naming_style.lower_camel_case_style.required_prefix = _
 dotnet_naming_style.on_upper_camel_case_style.capitalization = pascal_case
 dotnet_naming_style.on_upper_camel_case_style.required_prefix = On
 dotnet_naming_style.upper_camel_case_style.capitalization = pascal_case

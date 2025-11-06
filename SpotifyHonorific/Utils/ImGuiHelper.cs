@@ -4,12 +4,12 @@ using Dalamud.Interface.Utility;
 using Dalamud.Bindings.ImGui;
 using System.Numerics;
 
-namespace DiscordActivityHonorific.Utils;
+namespace SpotifyHonorific.Utils;
 
 public class ImGuiHelper
 {
     // Source: https://github.com/Caraxi/Honorific/blob/1.4.1.0/ConfigWindow.cs#L826
-    private Vector3 editingColour = Vector3.One;
+    private Vector3 _editingColour = Vector3.One;
     public bool DrawColorPicker(string label, ref Vector3? color, Vector2 checkboxSize)
     {
         var modified = false;
@@ -39,7 +39,7 @@ public class ImGuiHelper
         {
             if (ImGui.IsWindowAppearing())
             {
-                editingColour = color ?? Vector3.One;
+                _editingColour = color ?? Vector3.One;
             }
             if (ImGui.ColorButton($"##ColorPickClear", Vector4.One, ImGuiColorEditFlags.NoTooltip))
             {
@@ -72,9 +72,9 @@ public class ImGuiHelper
 
             ImGui.SameLine();
 
-            if (ImGui.ColorButton("Confirm", new Vector4(editingColour, 1), ImGuiColorEditFlags.NoTooltip, new Vector2(ImGui.GetContentRegionAvail().X, ImGui.GetItemRectSize().Y)))
+            if (ImGui.ColorButton("Confirm", new Vector4(_editingColour, 1), ImGuiColorEditFlags.NoTooltip, new Vector2(ImGui.GetContentRegionAvail().X, ImGui.GetItemRectSize().Y)))
             {
-                color = editingColour;
+                color = _editingColour;
                 modified = true;
                 ImGui.CloseCurrentPopup();
             }
@@ -87,8 +87,8 @@ public class ImGuiHelper
             }
 
             var textSize = ImGui.CalcTextSize("Confirm");
-            dl.AddText(ImGui.GetItemRectMin() + size / 2 - textSize / 2, ImGui.ColorConvertFloat4ToU32(new Vector4(editingColour, 1)) ^ 0x00FFFFFF, "Confirm");
-            ImGui.ColorPicker3($"##ColorPick", ref editingColour, ImGuiColorEditFlags.NoSidePreview | ImGuiColorEditFlags.NoSmallPreview);
+            dl.AddText(ImGui.GetItemRectMin() + size / 2 - textSize / 2, ImGui.ColorConvertFloat4ToU32(new Vector4(_editingColour, 1)) ^ 0x00FFFFFF, "Confirm");
+            ImGui.ColorPicker3($"##ColorPick", ref _editingColour, ImGuiColorEditFlags.NoSidePreview | ImGuiColorEditFlags.NoSmallPreview);
 
             ImGui.EndCombo();
         }

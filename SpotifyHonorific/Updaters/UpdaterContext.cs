@@ -1,4 +1,4 @@
-namespace DiscordActivityHonorific.Updaters;
+namespace SpotifyHonorific.Updaters;
 
 public class UpdaterContext
 { 

@@ -3,11 +3,12 @@ using Dalamud.IoC;
 using Dalamud.Plugin;
 using Dalamud.Interface.Windowing;
 using Dalamud.Plugin.Services;
-using DiscordActivityHonorific.Windows;
-using DiscordActivityHonorific.Activities;
-using DiscordActivityHonorific.Updaters;
+using SpotifyHonorific.Windows;
+using SpotifyHonorific.Updaters;
+using SpotifyHonorific.Activities;
+using SpotifyHonorific.Utils;
 
-namespace DiscordActivityHonorific;
+namespace SpotifyHonorific;
 
 public sealed class Plugin : IDalamudPlugin
 {
@@ -17,15 +18,15 @@ public sealed class Plugin : IDalamudPlugin
     [PluginService] internal static IPluginLog PluginLog { get; private set; } = null!;
     [PluginService] internal static IFramework Framework { get; private set; } = null!;
 
-    private const string CommandName = "/discordactivityhonorific";
-    private const string CommandHelpMessage = $"Available subcommands for {CommandName} are config, enable and disable";
+    private const string CommandName = "/spotifyhonorific";
+    private const string CommandHelpMessage = $"Use {CommandName} config to open the settings window.";
 
     public Config Config { get; init; }
 
-    public readonly WindowSystem WindowSystem = new("DiscordActivityHonorific");
+    public readonly WindowSystem WindowSystem = new("SpotifyHonorific");
     private ConfigWindow ConfigWindow { get; init; }
     private Updater Updater { get; init; }
-    
+
 
     public Plugin()
     {
@@ -57,18 +58,6 @@ public sealed class Plugin : IDalamudPlugin
         if (subcommand == "config")
         {
             ToggleConfigUI();
-        }
-        else if (subcommand == "enable")
-        {
-            Config.Enabled = true;
-            Config.Save();
-            Updater.Start();
-        }
-        else if (subcommand == "disable")
-        {
-            Config.Enabled = false;
-            Config.Save();
-            Updater.Stop();
         }
         else
         {

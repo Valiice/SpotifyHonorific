@@ -1,17 +1,21 @@
 using Dalamud.Configuration;
-using DiscordActivityHonorific.Activities;
+using SpotifyHonorific.Activities;
 using System;
 using System.Collections.Generic;
 
-namespace DiscordActivityHonorific;
+namespace SpotifyHonorific;
 
 [Serializable]
 public class Config : IPluginConfiguration
 {
     public int Version { get; set; } = 0;
     public bool Enabled { get; set; } = true;
-    public string Token { get; set; } = string.Empty;
-    public string Username { get; set; } = string.Empty;
+
+    public string SpotifyClientId { get; set; } = string.Empty;
+    public string SpotifyClientSecret { get; set; } = string.Empty;
+    public string SpotifyRefreshToken { get; set; } = string.Empty;
+    public DateTime LastSpotifyAuthTime { get; set; } = DateTime.MinValue;
+
     public List<ActivityConfig> ActivityConfigs { get; set; } = [];
 
     public Config() { }

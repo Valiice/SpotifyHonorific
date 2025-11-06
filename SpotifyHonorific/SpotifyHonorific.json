@@ -1,0 +1,12 @@
+{
+  "Author": "Vali",
+  "Name": "SpotifyHonorific",
+  "Punchline": "Your Spotify song as an honorific",
+  "Description": "Update honorific title based on your currently playing Spotify track",
+  "ApplicableVersion": "any",
+  "Tags": [
+    "spotify",
+    "activity",
+    "honorific"
+  ]
+}

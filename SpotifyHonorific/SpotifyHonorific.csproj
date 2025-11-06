@@ -1,15 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Project Sdk="Dalamud.NET.Sdk/13.0.0">
   <PropertyGroup>
-    <Description>Update honorific title based on discord activity informations</Description>
-    <PackageProjectUrl>https://github.com/anya-hichu/DiscordActivityHonorific</PackageProjectUrl>
+    <Description>Update honorific title based on spotify activity</Description>
+    <PackageProjectUrl>https://github.com/Valiice/SpotifyHonorific</PackageProjectUrl>
     <PackageLicenseExpression>AGPL-3.0-or-later</PackageLicenseExpression>
     <IsPackable>false</IsPackable>
     <TargetFramework>net9.0-windows7.0</TargetFramework>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Discord.Net.WebSocket" Version="3.18.0" />
     <PackageReference Include="Scriban" Version="6.5.0" />
+    <PackageReference Include="SpotifyAPI.Web" Version="7.2.1" />
+    <PackageReference Include="SpotifyAPI.Web.Auth" Version="7.2.1" />
   </ItemGroup>
 </Project>
