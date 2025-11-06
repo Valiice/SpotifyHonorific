@@ -4,7 +4,7 @@ Update honorific title based on your currently playing Spotify track.
 
 ## Installation
 
-Installable using my custom repository (instructions here: https://github.com/anya-hichu/DalamudPluginRepo) or from compiled archives.
+Installable using my custom repository (instructions here: https://github.com/Valiice/DalamudPluginRepo) or from compiled archives.
 
 ## Screenshots
 
