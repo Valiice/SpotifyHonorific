@@ -3,7 +3,7 @@ name: Build and Release
 on:
   push:
     tags:
-      - "*.*.*.*"
+      - "v*.*.*"
 
 jobs:
   Build:
@@ -28,8 +28,11 @@ jobs:
       - name: Restore Project
         run: dotnet restore
 
+      - name: Get version from tag
+        run: echo "VERSION=${GITHUB_REF_NAME#v}" >> $GITHUB_ENV
+
       - name: Build Project
-        run: dotnet build --configuration Release DiscordActivityHonorific/DiscordActivityHonorific.csproj -p:AssemblyVersion=${{ github.ref_name }}
+        run: dotnet build --configuration Release SpotifyHonorific/SpotifyHonorific.csproj -p:AssemblyVersion=${{ env.VERSION }}
 
       - name: Create Release
         uses: actions/create-release@v1
@@ -46,8 +49,8 @@ jobs:
         uses: actions/upload-release-asset@v1
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: DiscordActivityHonorific/bin/Release/DiscordActivityHonorific/latest.zip
-          asset_name: DiscordActivityHonorific.zip
+          asset_path: SpotifyHonorific/bin/Release/SpotifyHonorific/latest.zip
+          asset_name: SpotifyHonorific.zip
           asset_content_type: application/zip
         env:
           GITHUB_TOKEN: ${{ github.token }}
