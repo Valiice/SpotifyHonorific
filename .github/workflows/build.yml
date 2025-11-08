@@ -2,9 +2,9 @@ name: Build
 
 on:
   push:
-    branches: [ "master" ]
+    branches: [ "master", "main" ]
   pull_request:
-    branches: [ "master" ]
+    branches: [ "master", "main" ]
 
 jobs:
   Build:
@@ -30,12 +30,12 @@ jobs:
         run: dotnet restore
 
       - name: Build Project
-        run: dotnet build --configuration Release DiscordActivityHonorific/DiscordActivityHonorific.csproj
+        run: dotnet build --configuration Release SpotifyHonorific/SpotifyHonorific.csproj
 
       - name: Upload Artifacts
         uses: actions/upload-artifact@v5
         with:
-          name: DiscordActivityHonorific
+          name: SpotifyHonorific
           path: |
-             DiscordActivityHonorific/bin/Release/*
-             !DiscordActivityHonorific/bin/Release/DiscordActivityHonorific/*
+             SpotifyHonorific/bin/Release/*
+             !SpotifyHonorific/bin/Release/SpotifyHonorific/*
