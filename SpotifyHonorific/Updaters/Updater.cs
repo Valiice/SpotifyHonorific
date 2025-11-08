@@ -8,7 +8,9 @@ using SpotifyAPI.Web;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text;
 using System.Threading.Tasks;
+using SpotifyHonorific.Utils;
 
 namespace SpotifyHonorific.Updaters;
 
@@ -21,9 +23,13 @@ public class Updater : IDisposable
     private Config Config { get; init; }
     private IFramework Framework { get; init; }
     private IPluginLog PluginLog { get; init; }
+    private IClientState ClientState { get; init; }
 
     private ICallGateSubscriber<int, string, object> SetCharacterTitleSubscriber { get; init; }
     private ICallGateSubscriber<int, object> ClearCharacterTitleSubscriber { get; init; }
+
+    public bool IsPlayerAfk { get; private set; } = false;
+    private const uint AfkThreshold = 30000; // 30 seconds in milliseconds
 
     private Action? UpdateTitle { get; set; }
     private string? UpdatedTitleJson { get; set; }
@@ -34,14 +40,17 @@ public class Updater : IDisposable
     private string? CurrentAccessToken { get; set; }
     private double pollingTimer = 0.0;
     private bool isPolling = false;
+    private bool IsMusicPlaying = false;
     private string? CurrentTrackId { get; set; }
+    private bool hasLoggedAfk = false;
 
-    public Updater(IChatGui chatGui, Config config, IFramework framework, IDalamudPluginInterface pluginInterface, IPluginLog pluginLog)
+    public Updater(IChatGui chatGui, Config config, IFramework framework, IDalamudPluginInterface pluginInterface, IPluginLog pluginLog, IClientState clientState)
     {
         ChatGui = chatGui;
         Config = config;
         Framework = framework;
         PluginLog = pluginLog;
+        ClientState = clientState;
 
         SetCharacterTitleSubscriber = pluginInterface.GetIpcSubscriber<int, string, object>("Honorific.SetCharacterTitle");
         ClearCharacterTitleSubscriber = pluginInterface.GetIpcSubscriber<int, object>("Honorific.ClearCharacterTitle");
@@ -60,6 +69,32 @@ public class Updater : IDisposable
 
     private void OnFrameworkUpdate(IFramework framework)
     {
+        try
+        {
+            this.IsPlayerAfk = NativeMethods.IdleTimeFinder.GetIdleTime() > AfkThreshold;
+        }
+        catch (Exception e)
+        {
+            PluginLog.Warning(e, "Could not get system idle time.");
+            this.IsPlayerAfk = false;
+        }
+
+        if (this.IsPlayerAfk)
+        {
+            if (!hasLoggedAfk)
+            {
+                PluginLog.Debug("[SpotifyHonorific] Player is AFK, stopping polling.");
+                hasLoggedAfk = true;
+            }
+            ClearTitle();
+            pollingTimer = 0.0;
+            return;
+        }
+        else
+        {
+            hasLoggedAfk = false;
+        }
+
         if (UpdateTitle != null)
         {
             UpdaterContext.SecsElapsed += framework.UpdateDelta.TotalSeconds;
@@ -84,9 +119,44 @@ public class Updater : IDisposable
 
         pollingTimer += framework.UpdateDelta.TotalSeconds;
 
-        if (pollingTimer < POLLING_INTERVAL_SECONDS || Config.SpotifyRefreshToken.IsNullOrWhitespace() || isPolling)
+        double currentInterval = POLLING_INTERVAL_SECONDS;
+
+        if (pollingTimer < currentInterval || Config.SpotifyRefreshToken.IsNullOrWhitespace() || isPolling)
         {
             return;
+        }
+
+        if (Config.EnableDebugLogging)
+        {
+            var localPlayer = ClientState.LocalPlayer;
+            var statusListText = new StringBuilder();
+            statusListText.AppendLine($"[SpotifyHonorific] POLLING NOW. Timer: {pollingTimer:F2}/{currentInterval}s | IsPlaying: {IsMusicPlaying}");
+            if (localPlayer != null)
+            {
+                var statuses = localPlayer.StatusList.ToList();
+                if (statuses.Count == 0)
+                {
+                    statusListText.AppendLine("    Status List: (None)");
+                }
+                else
+                {
+                    statusListText.AppendLine("    Status List:");
+                    foreach (var s in statuses)
+                    {
+                        string statusName = s.GameData.Value.Name.ToString() ?? "Unknown Name";
+                        if (string.IsNullOrWhiteSpace(statusName))
+                        {
+                            statusName = "Unknown Name (Blank)";
+                        }
+                        statusListText.AppendLine($"        - ID: {s.StatusId}, Name: '{statusName}'");
+                    }
+                }
+            }
+            else
+            {
+                statusListText.AppendLine("    Status List: LocalPlayer is null");
+            }
+            PluginLog.Debug(statusListText.ToString());
         }
 
         pollingTimer = 0.0;
@@ -104,6 +174,7 @@ public class Updater : IDisposable
             var spotify = await GetSpotifyClient();
             if (spotify == null)
             {
+                IsMusicPlaying = false;
                 ClearTitle();
                 isPolling = false;
                 return;
@@ -112,6 +183,7 @@ public class Updater : IDisposable
             var currentlyPlaying = await spotify.Player.GetCurrentlyPlaying(new PlayerCurrentlyPlayingRequest());
             if (currentlyPlaying != null && currentlyPlaying.IsPlaying && currentlyPlaying.Item is FullTrack track)
             {
+                IsMusicPlaying = true;
                 if (track.Id == CurrentTrackId)
                 {
                     isPolling = false;
@@ -170,6 +242,7 @@ public class Updater : IDisposable
             }
             else
             {
+                IsMusicPlaying = false;
                 CurrentTrackId = null;
                 ClearTitle();
             }
@@ -180,12 +253,14 @@ public class Updater : IDisposable
             CurrentAccessToken = null;
             Spotify = null;
             CurrentTrackId = null;
+            IsMusicPlaying = false;
             ClearTitle();
         }
         catch (Exception e)
         {
             PluginLog.Error(e, "Unhandled error during Spotify poll");
             CurrentTrackId = null;
+            IsMusicPlaying = false;
             ClearTitle();
         }
         finally

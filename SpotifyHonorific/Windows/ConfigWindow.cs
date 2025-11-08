@@ -53,6 +53,34 @@ public class ConfigWindow : Window
             Config.Save();
         }
 
+        ImGui.SameLine();
+        var stopPollingWhenAfk = Config.StopPollingWhenAfk;
+        if (ImGui.Checkbox("Stop polling when AFK##stopAfk", ref stopPollingWhenAfk))
+        {
+            Config.StopPollingWhenAfk = stopPollingWhenAfk;
+            Config.Save();
+        }
+        ImGui.SameLine();
+        ImGui.TextDisabled("(?)");
+        if (ImGui.IsItemHovered())
+        {
+            ImGui.SetTooltip("Stops polling Spotify when your character has the <AFK> status.\nPolling will resume at a slower rate when you return.");
+        }
+
+        ImGui.SameLine();
+        var enableDebugLogging = Config.EnableDebugLogging;
+        if (ImGui.Checkbox("Debug Logging##debugLogging", ref enableDebugLogging))
+        {
+            Config.EnableDebugLogging = enableDebugLogging;
+            Config.Save();
+        }
+        ImGui.SameLine();
+        ImGui.TextDisabled("(?)");
+        if (ImGui.IsItemHovered())
+        {
+            ImGui.SetTooltip("Prints detailed status information to the FFXIV plugin log (open with /xllog).\nThis is very spammy and should be kept off unless you are debugging.");
+        }
+
         ImGui.Separator();
         ImGui.Text("Spotify Setup");
 

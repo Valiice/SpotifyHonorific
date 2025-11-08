@@ -16,6 +16,9 @@ public class Config : IPluginConfiguration
     public string SpotifyRefreshToken { get; set; } = string.Empty;
     public DateTime LastSpotifyAuthTime { get; set; } = DateTime.MinValue;
 
+    public bool StopPollingWhenAfk { get; set; } = true;
+    public bool EnableDebugLogging { get; set; } = false;
+
     public List<ActivityConfig> ActivityConfigs { get; set; } = [];
 
     public Config() { }
