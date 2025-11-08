@@ -8,7 +8,6 @@ using SpotifyAPI.Web;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 using SpotifyHonorific.Utils;
 
@@ -23,8 +22,6 @@ public class Updater : IDisposable
     private Config Config { get; init; }
     private IFramework Framework { get; init; }
     private IPluginLog PluginLog { get; init; }
-    private IClientState ClientState { get; init; }
-
     private ICallGateSubscriber<int, string, object> SetCharacterTitleSubscriber { get; init; }
     private ICallGateSubscriber<int, object> ClearCharacterTitleSubscriber { get; init; }
 
@@ -38,19 +35,18 @@ public class Updater : IDisposable
 
     private SpotifyClient? Spotify { get; set; }
     private string? CurrentAccessToken { get; set; }
-    private double pollingTimer = 0.0;
-    private bool isPolling = false;
-    private bool IsMusicPlaying = false;
+    private double _pollingTimer = 0.0;
+    private bool _isPolling = false;
+    private bool _isMusicPlaying = false;
     private string? CurrentTrackId { get; set; }
-    private bool hasLoggedAfk = false;
+    private bool _hasLoggedAfk = false;
 
-    public Updater(IChatGui chatGui, Config config, IFramework framework, IDalamudPluginInterface pluginInterface, IPluginLog pluginLog, IClientState clientState)
+    public Updater(IChatGui chatGui, Config config, IFramework framework, IDalamudPluginInterface pluginInterface, IPluginLog pluginLog)
     {
         ChatGui = chatGui;
         Config = config;
         Framework = framework;
         PluginLog = pluginLog;
-        ClientState = clientState;
 
         SetCharacterTitleSubscriber = pluginInterface.GetIpcSubscriber<int, string, object>("Honorific.SetCharacterTitle");
         ClearCharacterTitleSubscriber = pluginInterface.GetIpcSubscriber<int, object>("Honorific.ClearCharacterTitle");
@@ -79,20 +75,20 @@ public class Updater : IDisposable
             this.IsPlayerAfk = false;
         }
 
-        if (this.IsPlayerAfk)
+        if (this.IsPlayerAfk && !this._isMusicPlaying)
         {
-            if (!hasLoggedAfk)
+            if (!_hasLoggedAfk)
             {
-                PluginLog.Debug("[SpotifyHonorific] Player is AFK, stopping polling.");
-                hasLoggedAfk = true;
+                PluginLog.Debug("[SpotifyHonorific] Player is AFK and no music is playing, stopping polling.");
+                _hasLoggedAfk = true;
             }
             ClearTitle();
-            pollingTimer = 0.0;
+            _pollingTimer = 0.0;
             return;
         }
         else
         {
-            hasLoggedAfk = false;
+            _hasLoggedAfk = false;
         }
 
         if (UpdateTitle != null)
@@ -117,76 +113,48 @@ public class Updater : IDisposable
             return;
         }
 
-        pollingTimer += framework.UpdateDelta.TotalSeconds;
+        _pollingTimer += framework.UpdateDelta.TotalSeconds;
 
         double currentInterval = POLLING_INTERVAL_SECONDS;
 
-        if (pollingTimer < currentInterval || Config.SpotifyRefreshToken.IsNullOrWhitespace() || isPolling)
+        if (_pollingTimer < currentInterval || Config.SpotifyRefreshToken.IsNullOrWhitespace() || _isPolling)
         {
             return;
         }
 
         if (Config.EnableDebugLogging)
         {
-            var localPlayer = ClientState.LocalPlayer;
-            var statusListText = new StringBuilder();
-            statusListText.AppendLine($"[SpotifyHonorific] POLLING NOW. Timer: {pollingTimer:F2}/{currentInterval}s | IsPlaying: {IsMusicPlaying}");
-            if (localPlayer != null)
-            {
-                var statuses = localPlayer.StatusList.ToList();
-                if (statuses.Count == 0)
-                {
-                    statusListText.AppendLine("    Status List: (None)");
-                }
-                else
-                {
-                    statusListText.AppendLine("    Status List:");
-                    foreach (var s in statuses)
-                    {
-                        string statusName = s.GameData.Value.Name.ToString() ?? "Unknown Name";
-                        if (string.IsNullOrWhiteSpace(statusName))
-                        {
-                            statusName = "Unknown Name (Blank)";
-                        }
-                        statusListText.AppendLine($"        - ID: {s.StatusId}, Name: '{statusName}'");
-                    }
-                }
-            }
-            else
-            {
-                statusListText.AppendLine("    Status List: LocalPlayer is null");
-            }
-            PluginLog.Debug(statusListText.ToString());
+            PluginLog.Debug($"[SpotifyHonorific] POLLING NOW. Timer: {_pollingTimer:F2}/{currentInterval}s | IsPlaying: {_isMusicPlaying}");
         }
 
-        pollingTimer = 0.0;
+        _pollingTimer = 0.0;
 
         _ = PollSpotify();
     }
 
     private async Task PollSpotify()
     {
-        if (isPolling) return;
-        isPolling = true;
+        if (_isPolling) return;
+        _isPolling = true;
 
         try
         {
             var spotify = await GetSpotifyClient();
             if (spotify == null)
             {
-                IsMusicPlaying = false;
+                _isMusicPlaying = false;
                 ClearTitle();
-                isPolling = false;
+                _isPolling = false;
                 return;
             }
 
             var currentlyPlaying = await spotify.Player.GetCurrentlyPlaying(new PlayerCurrentlyPlayingRequest());
             if (currentlyPlaying != null && currentlyPlaying.IsPlaying && currentlyPlaying.Item is FullTrack track)
             {
-                IsMusicPlaying = true;
+                _isMusicPlaying = true;
                 if (track.Id == CurrentTrackId)
                 {
-                    isPolling = false;
+                    _isPolling = false;
                     return;
                 }
 
@@ -196,7 +164,7 @@ public class Updater : IDisposable
                 if (activityConfig == null)
                 {
                     ClearTitle();
-                    isPolling = false;
+                    _isPolling = false;
                     return;
                 }
 
@@ -242,7 +210,7 @@ public class Updater : IDisposable
             }
             else
             {
-                IsMusicPlaying = false;
+                _isMusicPlaying = false;
                 CurrentTrackId = null;
                 ClearTitle();
             }
@@ -253,19 +221,19 @@ public class Updater : IDisposable
             CurrentAccessToken = null;
             Spotify = null;
             CurrentTrackId = null;
-            IsMusicPlaying = false;
+            _isMusicPlaying = false;
             ClearTitle();
         }
         catch (Exception e)
         {
             PluginLog.Error(e, "Unhandled error during Spotify poll");
             CurrentTrackId = null;
-            IsMusicPlaying = false;
+            _isMusicPlaying = false;
             ClearTitle();
         }
         finally
         {
-            isPolling = false;
+            _isPolling = false;
         }
     }
 
