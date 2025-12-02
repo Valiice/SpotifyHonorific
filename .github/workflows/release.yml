@@ -4,6 +4,15 @@ on:
   push:
     tags:
       - "v*.*.*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (e.g. 1.0.0)'
+        required: true
+        default: '1.0.0'
+
+permissions:
+  contents: write
 
 jobs:
   Build:
@@ -28,8 +37,18 @@ jobs:
       - name: Restore Project
         run: dotnet restore
 
-      - name: Get version from tag
-        run: echo "VERSION=${GITHUB_REF_NAME#v}" >> $GITHUB_ENV
+      - name: Determine Version
+        id: get_version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            # Manual run: use the input version
+            echo "VERSION=${{ github.event.inputs.version }}" >> $GITHUB_ENV
+            echo "TAG_NAME=v${{ github.event.inputs.version }}" >> $GITHUB_ENV
+          else
+            # Tag push: strip the 'v' prefix
+            echo "VERSION=${GITHUB_REF_NAME#v}" >> $GITHUB_ENV
+            echo "TAG_NAME=${GITHUB_REF_NAME}" >> $GITHUB_ENV
+          fi
 
       - name: Build Project
         run: dotnet build --configuration Release SpotifyHonorific/SpotifyHonorific.csproj -p:AssemblyVersion=${{ env.VERSION }}
@@ -40,8 +59,8 @@ jobs:
         with:
           draft: false
           prerelease: false
-          release_name: ${{ github.ref_name }}
-          tag_name: ${{ github.ref_name }}
+          release_name: ${{ env.TAG_NAME }}
+          tag_name: ${{ env.TAG_NAME }}
         env:
           GITHUB_TOKEN: ${{ github.token }}
 
