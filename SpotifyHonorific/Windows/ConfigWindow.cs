@@ -312,14 +312,27 @@ public class ConfigWindow : Window
         ImGui.Spacing();
         ImGui.SameLine();
 
+        var rainbowMode = activityConfig.RainbowMode;
+        if (ImGui.Checkbox($"Rainbow Mode###{activityConfigId}Rainbow", ref rainbowMode))
+        {
+            activityConfig.RainbowMode = rainbowMode;
+            Config.Save();
+        }
+
+        ImGui.SameLine();
+        ImGui.Spacing();
+        ImGui.SameLine();
+
         var checkboxSize = new Vector2(ImGui.GetTextLineHeightWithSpacing(), ImGui.GetTextLineHeightWithSpacing());
 
+        ImGui.BeginDisabled(activityConfig.RainbowMode);
         var color = activityConfig.Color;
         if (ImGuiHelper.DrawColorPicker($"Color###{activityConfigId}Color", ref color, checkboxSize))
         {
             activityConfig.Color = color;
             Config.Save();
         }
+        ImGui.EndDisabled();
 
         ImGui.SameLine();
         ImGui.Spacing();

@@ -11,6 +11,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using SpotifyHonorific.Utils;
 using SpotifyHonorific.Activities;
+using System.Numerics;
 
 namespace SpotifyHonorific.Updaters;
 
@@ -243,10 +244,18 @@ public class Updater : IDisposable
         }
         DisplayedMaxLengthError = false;
 
+        Vector3? colorToUse = activityConfig.Color;
+
+        if (activityConfig.RainbowMode)
+        {
+            float hue = (float)(UpdaterContext.SecsElapsed * 0.5) % 1.0f;
+            colorToUse = HsvToRgb(hue, 1.0f, 1.0f);
+        }
+
         var data = new Dictionary<string, object>() {
             {"Title", title},
             {"IsPrefix", activityConfig.IsPrefix},
-            {"Color", activityConfig.Color!},
+            {"Color", colorToUse!},
             {"Glow", activityConfig.Glow!}
         };
 
@@ -259,6 +268,26 @@ public class Updater : IDisposable
         }
         SetCharacterTitleSubscriber.InvokeAction(0, serializedData);
         UpdatedTitleJson = serializedData;
+    }
+
+    private static Vector3 HsvToRgb(float h, float s, float v)
+    {
+        var i = (int)(h * 6);
+        var f = h * 6 - i;
+
+        var p = v * (1 - s);
+        var q = v * (1 - f * s);
+        var t = v * (1 - (1 - f) * s);
+
+        return (i % 6) switch
+        {
+            0 => new(v, t, p),
+            1 => new(q, v, p),
+            2 => new(p, v, t),
+            3 => new(p, q, v),
+            4 => new(t, p, v),
+            _ => new(v, p, q)
+        };
     }
 
     private void HandleSpotifyError(Exception? e, string message)
