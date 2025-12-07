@@ -1,8 +1,9 @@
-name: Weekly Release Scheduler
+name: Daily Release Scheduler
 
 on:
   schedule:
-    - cron: '0 4 * * 1'
+    # Runs at 04:00 UTC every day
+    - cron: '0 4 * * *'
   workflow_dispatch:
 
 jobs:
@@ -45,7 +46,9 @@ jobs:
           VERSION=${LATEST_TAG#v}
           IFS='.' read -r major minor patch <<< "$VERSION"
 
+          patch=${patch:-0}
           NEW_PATCH=$((patch + 1))
+          
           NEW_TAG="v$major.$minor.$NEW_PATCH"
           
           echo "New version will be: $NEW_TAG"
