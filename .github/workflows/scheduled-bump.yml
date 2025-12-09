@@ -2,15 +2,15 @@ name: Daily Release Scheduler
 
 on:
   schedule:
-    # Runs at 04:00 UTC every day
     - cron: '0 4 * * *'
   workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   check-and-tag:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -27,21 +27,24 @@ jobs:
         id: version
         run: |
           LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
-          echo "Latest tag found: $LATEST_TAG"
 
-          if [ "$LATEST_TAG" != "v0.0.0" ]; then
-            COMMITS=$(git log $LATEST_TAG..HEAD --oneline)
-          else
-            COMMITS=$(git log --oneline)
+          LOG_RANGE="$LATEST_TAG..HEAD"
+          if [ "$LATEST_TAG" = "v0.0.0" ]; then
+              LOG_RANGE="HEAD"
           fi
 
-          if [ -z "$COMMITS" ]; then
-            echo "No new commits since $LATEST_TAG. Skipping release."
+          RELEVANT_COMMIT_COUNT=$(
+            git log $LOG_RANGE --pretty="%s" | 
+            grep -vE "^(Bump actions/|Merge pull request #.* from dependabot/gh_actions/.*)$" | 
+            awk 'NF' | 
+            wc -l
+          )
+          
+          if [ "$RELEVANT_COMMIT_COUNT" -eq 0 ]; then
+            echo "Only non-application commits found (Count: 0). Skipping release."
             echo "should_release=false" >> $GITHUB_OUTPUT
             exit 0
           fi
-
-          echo "Found new commits. Proceeding with bump."
 
           VERSION=${LATEST_TAG#v}
           IFS='.' read -r major minor patch <<< "$VERSION"
@@ -51,7 +54,6 @@ jobs:
           
           NEW_TAG="v$major.$minor.$NEW_PATCH"
           
-          echo "New version will be: $NEW_TAG"
           echo "TAG_NAME=$NEW_TAG" >> $GITHUB_ENV
           echo "should_release=true" >> $GITHUB_OUTPUT
 
