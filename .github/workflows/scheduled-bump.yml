@@ -13,7 +13,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
           token: ${{ secrets.PAT_TOKEN }}
@@ -27,24 +27,29 @@ jobs:
         id: version
         run: |
           LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+          echo "Latest tag found: $LATEST_TAG"
 
           LOG_RANGE="$LATEST_TAG..HEAD"
           if [ "$LATEST_TAG" = "v0.0.0" ]; then
               LOG_RANGE="HEAD"
           fi
 
-          RELEVANT_COMMIT_COUNT=$(
+          DEPENDABOT_UPDATES=$(
             git log $LOG_RANGE --pretty="%s" | 
-            grep -vE "^(Bump actions/|Merge pull request #.* from dependabot/gh_actions/.*)$" | 
-            awk 'NF' | 
+            grep -i "dependabot/" | 
+            grep -vi "dependabot/github_actions" | 
             wc -l
           )
           
-          if [ "$RELEVANT_COMMIT_COUNT" -eq 0 ]; then
-            echo "Only non-application commits found (Count: 0). Skipping release."
+          echo "Found $DEPENDABOT_UPDATES code dependency updates."
+
+          if [ "$DEPENDABOT_UPDATES" -eq 0 ]; then
+            echo "No Dependabot code merges found (Manual commits & Action updates are ignored). Skipping release."
             echo "should_release=false" >> $GITHUB_OUTPUT
             exit 0
           fi
+
+          echo "Found valid Dependabot code merge. Proceeding with patch release."
 
           VERSION=${LATEST_TAG#v}
           IFS='.' read -r major minor patch <<< "$VERSION"
@@ -54,6 +59,7 @@ jobs:
           
           NEW_TAG="v$major.$minor.$NEW_PATCH"
           
+          echo "New Version: $NEW_TAG"
           echo "TAG_NAME=$NEW_TAG" >> $GITHUB_ENV
           echo "should_release=true" >> $GITHUB_OUTPUT
 
