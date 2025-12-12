@@ -1,12 +1,20 @@
 {
   "Author": "Vali",
   "Name": "SpotifyHonorific",
+  "InternalName": "SpotifyHonorific",
   "Punchline": "Your Spotify song as an honorific",
   "Description": "Update honorific title based on your currently playing Spotify track",
+  "RepoUrl": "https://github.com/Valiice/SpotifyHonorific",
   "ApplicableVersion": "any",
   "Tags": [
     "spotify",
     "activity",
     "honorific"
+  ],
+  "IconUrl": "https://raw.githubusercontent.com/Valiice/SpotifyHonorific/main/images/spotify_logo.png",
+  "ImageUrls": [
+    "https://raw.githubusercontent.com/Valiice/SpotifyHonorific/main/images/image1.png",
+    "https://raw.githubusercontent.com/Valiice/SpotifyHonorific/main/images/image2.png",
+    "https://raw.githubusercontent.com/Valiice/SpotifyHonorific/main/images/image3.png"
   ]
 }
