@@ -33,10 +33,10 @@ To connect the plugin to your Spotify account, you need to create a simple "App"
 ### 2. Configure the App
 1.  **App Name:** Enter a name (e.g., "FFXIV Honorific").
 2.  **App Description:** Enter a short description (e.g., "FFXIV integration").
-3.  **Redirect URIs:** **Important!** You must enter the exact URI below:
-    ```
-    [http://127.0.0.1:5000/callback](http://127.0.0.1:5000/callback)
-    ```
+3.  **Redirect URIs:** **Important!** You must enter the exact URI:
+    `
+    http://127.0.0.1:5000/callback
+    `
 4.  Click **Add** next to the URI box.
 5.  Under "Which API/SDKs are you planning to use?", check the box for **Web API**.
 6.  Scroll to the bottom and click **Save**.
