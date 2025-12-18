@@ -4,6 +4,7 @@
 [![GitHub Release](https://img.shields.io/github/v/release/Valiice/SpotifyHonorific?include_prereleases&style=flat-square&color=green)](https://github.com/Valiice/SpotifyHonorific/releases/latest)
 [![GitHub License](https://img.shields.io/github/license/Valiice/SpotifyHonorific?style=flat-square&color=orange)](LICENSE.md)
 [![GitHub Issues](https://img.shields.io/github/issues/Valiice/SpotifyHonorific?style=flat-square)](https://github.com/Valiice/SpotifyHonorific/issues)
+[![Download Latest Zip](https://img.shields.io/badge/Download-Latest%20Zip-blue?style=flat-square&logo=spotify)](https://github.com/Valiice/SpotifyHonorific/releases/latest/download/SpotifyHonorific.zip)
 
 **SpotifyHonorific** is a Dalamud plugin for Final Fantasy XIV that dynamically updates your character's honorific title based on the track you are currently listening to on Spotify.
 
