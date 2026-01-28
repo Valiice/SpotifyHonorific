@@ -60,6 +60,9 @@ jobs:
       - name: Build Project
         run: dotnet build --configuration Release SpotifyHonorific/SpotifyHonorific.csproj -p:AssemblyVersion=${{ env.VERSION }}
 
+      - name: Rename Release Asset
+        run: mv SpotifyHonorific/bin/Release/SpotifyHonorific/latest.zip SpotifyHonorific/bin/Release/SpotifyHonorific/SpotifyHonorific.zip
+
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
@@ -67,6 +70,6 @@ jobs:
           tag_name: ${{ env.TAG_NAME }}
           draft: false
           prerelease: false
-          files: SpotifyHonorific/bin/Release/SpotifyHonorific/latest.zip
+          files: SpotifyHonorific/bin/Release/SpotifyHonorific/SpotifyHonorific.zip
         env:
           GITHUB_TOKEN: ${{ github.token }}
