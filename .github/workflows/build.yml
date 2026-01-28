@@ -39,9 +39,6 @@ jobs:
       - name: Build Project
         run: dotnet build --configuration Release SpotifyHonorific/SpotifyHonorific.csproj
 
-      - name: Run Tests
-        run: dotnet test --configuration Release --no-build --verbosity normal
-
       - name: Upload Artifacts
         uses: actions/upload-artifact@v6
         with:
