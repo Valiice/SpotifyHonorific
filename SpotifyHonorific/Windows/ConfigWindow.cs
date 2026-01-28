@@ -1,13 +1,10 @@
 using Dalamud.Interface.Colors;
-using Dalamud.Interface.Utility.Raii;
 using Dalamud.Interface.Windowing;
 using Dalamud.Utility;
 using SpotifyHonorific.Activities;
 using SpotifyHonorific.Updaters;
 using SpotifyHonorific.Utils;
 using Dalamud.Bindings.ImGui;
-using Scriban;
-using System.Linq;
 using System.Numerics;
 using Scriban.Helpers;
 using SpotifyAPI.Web.Auth;
@@ -20,6 +17,11 @@ namespace SpotifyHonorific.Windows;
 
 public class ConfigWindow : Window
 {
+    private const int SPOTIFY_AUTH_TIMEOUT_MINUTES = 1;
+    private const int SPOTIFY_CLIENT_ID_MAX_LENGTH = 100;
+    private const int SPOTIFY_CLIENT_SECRET_MAX_LENGTH = 100;
+    private const ushort MAX_INPUT_LENGTH = ushort.MaxValue;
+
     private Config Config { get; init; }
     private ImGuiHelper ImGuiHelper { get; init; }
     private Updater Updater { get; init; }
@@ -31,7 +33,8 @@ public class ConfigWindow : Window
     private string _lastAuthTimeString = string.Empty;
     private DateTime _cachedAuthTime;
 
-    private static readonly string RecreateText = $"Recreate Defaults (V{ActivityConfig.DEFAULT_VERSION})";
+    private static readonly string RecreateText = "Recreate Defaults";
+    private static readonly System.Reflection.PropertyInfo[] UpdaterContextProperties = typeof(UpdaterContext).GetProperties();
 
     public ConfigWindow(Config config, ImGuiHelper imGuiHelper, Updater updater) : base("Spotify Activity Honorific Config##configWindow")
     {
@@ -69,7 +72,6 @@ public class ConfigWindow : Window
         }
 
         ImGui.SameLine();
-        ImGui.SameLine();
         ImGui.TextDisabled("(?)");
         if (ImGui.IsItemHovered())
         {
@@ -89,19 +91,64 @@ public class ConfigWindow : Window
         {
             ImGui.SetTooltip("Prints detailed status information to the FFXIV plugin log (open with /xllog).\nThis is very spammy and should be kept off unless you are debugging.");
         }
+
+        ImGui.Spacing();
+        DrawActiveConfigSelector();
+    }
+
+    private void DrawActiveConfigSelector()
+    {
+        if (Config.ActivityConfigs.Count == 0)
+        {
+            ImGui.TextColored(ImGuiColors.DalamudRed, "No configs available. Create one below.");
+            return;
+        }
+
+        ImGui.Text("Active Config:");
+        ImGui.SameLine();
+
+        var currentIndex = 0;
+        for (var i = 0; i < Config.ActivityConfigs.Count; i++)
+        {
+            if (Config.ActivityConfigs[i].Name == Config.ActiveConfigName)
+            {
+                currentIndex = i;
+                break;
+            }
+        }
+
+        var configNames = new string[Config.ActivityConfigs.Count];
+        for (var i = 0; i < Config.ActivityConfigs.Count; i++)
+        {
+            var name = Config.ActivityConfigs[i].Name;
+            configNames[i] = string.IsNullOrWhiteSpace(name) ? $"(Blank #{i + 1})" : name;
+        }
+
+        if (ImGui.Combo("##activeConfig", ref currentIndex, configNames, configNames.Length))
+        {
+            Config.ActiveConfigName = Config.ActivityConfigs[currentIndex].Name;
+            Config.Save();
+        }
+
+        ImGui.SameLine();
+        ImGui.TextDisabled("(?)");
+        if (ImGui.IsItemHovered())
+        {
+            ImGui.SetTooltip("Select which config template to use when Spotify is playing.\nCreate additional configs in the tabs below for different styles.");
+        }
     }
 
     private void DrawSpotifySetup()
     {
         ImGui.Text("Spotify Setup");
 
-        if (ImGui.InputText("Spotify Client ID", ref _spotifyClientIdBuffer, 100))
+        if (ImGui.InputText("Spotify Client ID", ref _spotifyClientIdBuffer, SPOTIFY_CLIENT_ID_MAX_LENGTH))
         {
             Config.SpotifyClientId = _spotifyClientIdBuffer;
             Config.Save();
         }
 
-        if (ImGui.InputText("Spotify Client Secret", ref _spotifyClientSecretBuffer, 100, ImGuiInputTextFlags.Password))
+        if (ImGui.InputText("Spotify Client Secret", ref _spotifyClientSecretBuffer, SPOTIFY_CLIENT_SECRET_MAX_LENGTH, ImGuiInputTextFlags.Password))
         {
             Config.SpotifyClientSecret = _spotifyClientSecretBuffer;
             Config.Save();
@@ -149,7 +196,17 @@ public class ConfigWindow : Window
     {
         if (ImGui.Button("New##activityConfigsNew"))
         {
-            Config.ActivityConfigs.Add(new());
+            var newConfig = new ActivityConfig
+            {
+                Name = $"New Config {Config.ActivityConfigs.Count + 1}"
+            };
+            Config.ActivityConfigs.Add(newConfig);
+
+            if (string.IsNullOrEmpty(Config.ActiveConfigName))
+            {
+                Config.ActiveConfigName = newConfig.Name;
+            }
+
             Config.Save();
         }
 
@@ -163,7 +220,14 @@ public class ConfigWindow : Window
 
         if (ImGui.Button(RecreateText + "##activityConfigsRecreateDefaults"))
         {
-            Config.ActivityConfigs.AddRange(ActivityConfig.GetDefaults());
+            var defaults = ActivityConfig.GetDefaults();
+            Config.ActivityConfigs.AddRange(defaults);
+
+            if (string.IsNullOrEmpty(Config.ActiveConfigName) && defaults.Count > 0)
+            {
+                Config.ActiveConfigName = defaults[0].Name;
+            }
+
             Config.Save();
         }
 
@@ -172,15 +236,16 @@ public class ConfigWindow : Window
         if (ImGui.Button("Delete All##activityConfigsDeleteAll"))
         {
             Config.ActivityConfigs.Clear();
+            Config.ActiveConfigName = string.Empty;
             Config.Save();
         }
         ImGui.PopStyleColor();
 
         if (ImGui.BeginTabBar("activityConfigsTabBar"))
         {
-            foreach (var activityConfig in Config.ActivityConfigs.ToList())
+            for (var i = Config.ActivityConfigs.Count - 1; i >= 0; i--)
             {
-                DrawSingleActivityTab(activityConfig);
+                DrawSingleActivityTab(Config.ActivityConfigs[i]);
             }
             ImGui.EndTabBar();
         }
@@ -196,10 +261,9 @@ public class ConfigWindow : Window
 
         ImGui.Indent(10);
 
-        var activityConfigEnabled = activityConfig.Enabled;
-        if (ImGui.Checkbox($"Enabled###{activityConfigId}enabled", ref activityConfigEnabled))
+        if (ImGui.InputText($"Name###{activityConfigId}Name", ref name, MAX_INPUT_LENGTH))
         {
-            activityConfig.Enabled = activityConfigEnabled;
+            activityConfig.Name = name;
             Config.Save();
         }
 
@@ -208,22 +272,13 @@ public class ConfigWindow : Window
         if (ImGui.Button($"Delete###{activityConfigId}Delete"))
         {
             Config.ActivityConfigs.Remove(activityConfig);
+            if (Config.ActiveConfigName == activityConfig.Name && Config.ActivityConfigs.Count > 0)
+            {
+                Config.ActiveConfigName = Config.ActivityConfigs[0].Name;
+            }
             Config.Save();
         }
         ImGui.PopStyleColor();
-
-        if (ImGui.InputText($"Name###{activityConfigId}Name", ref name, ushort.MaxValue))
-        {
-            activityConfig.Name = name;
-            Config.Save();
-        }
-
-        var priority = activityConfig.Priority;
-        if (ImGui.InputInt($"Priority###{activityConfigId}Priority", ref priority, 1))
-        {
-            activityConfig.Priority = priority;
-            Config.Save();
-        }
 
         DrawTemplateVariablesTable(activityConfigId);
 
@@ -273,7 +328,7 @@ public class ConfigWindow : Window
             ImGui.TableNextRow(); ImGui.TableNextColumn(); ImGui.Text("Activity.DurationMs"); ImGui.TableNextColumn(); ImGui.Text("System.Int32");
             ImGui.TableNextRow(); ImGui.TableNextColumn(); ImGui.Text("Activity.Popularity"); ImGui.TableNextColumn(); ImGui.Text("System.Int32");
 
-            foreach (var property in typeof(UpdaterContext).GetProperties())
+            foreach (var property in UpdaterContextProperties)
             {
                 if (ImGui.TableNextColumn())
                 {
@@ -291,7 +346,7 @@ public class ConfigWindow : Window
 
     private static bool DrawTemplateInput(string label, ref string template, Vector2 size, string validTooltip)
     {
-        var changed = ImGui.InputTextMultiline(label, ref template, ushort.MaxValue, size);
+        var changed = ImGui.InputTextMultiline(label, ref template, MAX_INPUT_LENGTH, size);
 
         if (ImGui.IsItemHovered())
         {
@@ -308,10 +363,8 @@ public class ConfigWindow : Window
             activityConfig.IsPrefix = isPrefix;
             Config.Save();
         }
-        ImGui.SameLine();
-        ImGui.Spacing();
-        ImGui.SameLine();
 
+        ImGui.SameLine();
         var rainbowMode = activityConfig.RainbowMode;
         if (ImGui.Checkbox($"Rainbow Mode###{activityConfigId}Rainbow", ref rainbowMode))
         {
@@ -319,8 +372,6 @@ public class ConfigWindow : Window
             Config.Save();
         }
 
-        ImGui.SameLine();
-        ImGui.Spacing();
         ImGui.SameLine();
 
         var checkboxSize = new Vector2(ImGui.GetTextLineHeightWithSpacing(), ImGui.GetTextLineHeightWithSpacing());
@@ -334,8 +385,6 @@ public class ConfigWindow : Window
         }
         ImGui.EndDisabled();
 
-        ImGui.SameLine();
-        ImGui.Spacing();
         ImGui.SameLine();
         var glow = activityConfig.Glow;
         if (ImGuiHelper.DrawColorPicker($"Glow###{activityConfigId}Glow", ref glow, checkboxSize))
@@ -365,7 +414,7 @@ public class ConfigWindow : Window
 
             BrowserUtil.Open(loginRequest.ToUri());
 
-            using var timeoutCts = new CancellationTokenSource(TimeSpan.FromMinutes(1));
+            using var timeoutCts = new CancellationTokenSource(TimeSpan.FromMinutes(SPOTIFY_AUTH_TIMEOUT_MINUTES));
             var context = await _spotifyAuthServer.ReceiveContext(timeoutCts.Token).ConfigureAwait(false);
 
             var code = context.Request.QueryString["code"];
@@ -400,12 +449,5 @@ public class ConfigWindow : Window
     {
         _spotifyAuthServer?.Dispose();
         _spotifyAuthServer = null;
-    }
-
-    private static bool TryParseTemplate(string template, out LogMessageBag errorMessages)
-    {
-        var parsed = Template.Parse(template);
-        errorMessages = parsed.Messages;
-        return !parsed.HasErrors;
     }
 }

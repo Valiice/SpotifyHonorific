@@ -24,14 +24,17 @@ internal static class NativeMethods
 
         public static uint GetIdleTime()
         {
-            LASTINPUTINFO lastInPut = new LASTINPUTINFO();
-            lastInPut.cbSize = (uint)Marshal.SizeOf(lastInPut);
+            var lastInPut = new LASTINPUTINFO
+            {
+                cbSize = (uint)Marshal.SizeOf<LASTINPUTINFO>()
+            };
+
             if (!GetLastInputInfo(ref lastInPut))
             {
                 throw new Exception(GetLastError().ToString());
             }
 
-            return ((uint)Environment.TickCount - lastInPut.dwTime);
+            return (uint)Environment.TickCount64 - lastInPut.dwTime;
         }
     }
 }

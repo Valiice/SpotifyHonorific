@@ -31,6 +31,13 @@ public sealed class Plugin : IDalamudPlugin
     public Plugin()
     {
         Config = PluginInterface.GetPluginConfig() as Config ?? new Config(ActivityConfig.GetDefaults());
+        Config.Initialize(PluginInterface);
+
+        if (string.IsNullOrEmpty(Config.ActiveConfigName) && Config.ActivityConfigs.Count > 0)
+        {
+            Config.ActiveConfigName = Config.ActivityConfigs[0].Name;
+            Config.Save();
+        }
 
         Updater = new(ChatGui, Config, Framework, PluginInterface, PluginLog);
         ConfigWindow = new ConfigWindow(Config, new(), Updater);

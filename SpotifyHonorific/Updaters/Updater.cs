@@ -7,7 +7,7 @@ using Scriban;
 using SpotifyAPI.Web;
 using System;
 using System.Collections.Generic;
-using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using SpotifyHonorific.Utils;
 using SpotifyHonorific.Activities;
@@ -20,6 +20,9 @@ public class Updater : IDisposable
     private const ushort MAX_TITLE_LENGTH = 32;
     private const double POLLING_INTERVAL_SECONDS = 2.0;
     private const uint AFK_THRESHOLD_MS = 30000;
+    private const int API_TIMEOUT_MS = 5000;
+    private const int TOKEN_REFRESH_WINDOW_MINUTES = 55;
+    private const float RAINBOW_HUE_SPEED = 0.5f;
 
     private IChatGui ChatGui { get; init; }
     private Config Config { get; init; }
@@ -115,7 +118,9 @@ public class Updater : IDisposable
         }
         catch (Exception e)
         {
-            PluginLog.Error(e.ToString());
+            PluginLog.Error(e, "Failed to update title");
+            ChatGui.PrintError($"SpotifyHonorific: Failed to update title. Check /xllog for details.");
+            UpdateTitle = null;
         }
     }
 
@@ -153,14 +158,16 @@ public class Updater : IDisposable
 
         try
         {
-            var spotify = await GetSpotifyClient().ConfigureAwait(false);
+            using var cts = new CancellationTokenSource(API_TIMEOUT_MS);
+
+            var spotify = await GetSpotifyClient(cts.Token).ConfigureAwait(false);
             if (spotify == null)
             {
                 HandleSpotifyError(null, "Spotify client is null, likely not authenticated.");
                 return;
             }
 
-            var currentlyPlaying = await spotify.Player.GetCurrentlyPlaying(new PlayerCurrentlyPlayingRequest()).ConfigureAwait(false);
+            var currentlyPlaying = await spotify.Player.GetCurrentlyPlaying(new PlayerCurrentlyPlayingRequest(), cts.Token).ConfigureAwait(false);
             if (currentlyPlaying != null && currentlyPlaying.IsPlaying && currentlyPlaying.Item is FullTrack track)
             {
                 _isMusicPlaying = true;
@@ -172,6 +179,10 @@ public class Updater : IDisposable
                 CurrentTrackId = null;
                 ClearTitle();
             }
+        }
+        catch (OperationCanceledException)
+        {
+            HandleSpotifyError(null, "Spotify API request timed out after 5 seconds.");
         }
         catch (APIException e)
         {
@@ -196,7 +207,24 @@ public class Updater : IDisposable
 
         CurrentTrackId = track.Id;
 
-        var activityConfig = Config.ActivityConfigs.Where(c => c.Enabled).OrderByDescending(c => c.Priority).FirstOrDefault();
+        var activityConfig = Config.WithLock(() =>
+        {
+            if (string.IsNullOrEmpty(Config.ActiveConfigName))
+            {
+                return Config.ActivityConfigs.Count > 0 ? Config.ActivityConfigs[0] : null;
+            }
+
+            foreach (var config in Config.ActivityConfigs)
+            {
+                if (config.Name == Config.ActiveConfigName)
+                {
+                    return config;
+                }
+            }
+
+            return Config.ActivityConfigs.Count > 0 ? Config.ActivityConfigs[0] : null;
+        });
+
         if (activityConfig == null)
         {
             ClearTitle();
@@ -211,7 +239,7 @@ public class Updater : IDisposable
     {
         return () =>
         {
-            if (!Config.Enabled || !activityConfig.Enabled)
+            if (!Config.Enabled)
             {
                 ClearTitle();
                 return;
@@ -226,6 +254,13 @@ public class Updater : IDisposable
         if (!_templateCache.TryGetValue(activityConfig.TitleTemplate, out var titleTemplate))
         {
             titleTemplate = Template.Parse(activityConfig.TitleTemplate);
+            if (titleTemplate.HasErrors)
+            {
+                var errorMessage = $"Template parsing failed: {string.Join(", ", titleTemplate.Messages)}";
+                PluginLog.Error(errorMessage);
+                ChatGui.PrintError($"SpotifyHonorific: {errorMessage}");
+                return;
+            }
             _templateCache[activityConfig.TitleTemplate] = titleTemplate;
         }
 
@@ -248,18 +283,18 @@ public class Updater : IDisposable
 
         if (activityConfig.RainbowMode)
         {
-            float hue = (float)(UpdaterContext.SecsElapsed * 0.5) % 1.0f;
+            float hue = (float)(UpdaterContext.SecsElapsed * RAINBOW_HUE_SPEED) % 1.0f;
             colorToUse = HsvToRgb(hue, 1.0f, 1.0f);
         }
 
-        var data = new Dictionary<string, object>() {
+        var data = new Dictionary<string, object?> {
             {"Title", title},
             {"IsPrefix", activityConfig.IsPrefix},
-            {"Color", colorToUse!},
-            {"Glow", activityConfig.Glow!}
+            {"Color", colorToUse},
+            {"Glow", activityConfig.Glow}
         };
 
-        var serializedData = JsonConvert.SerializeObject(data, Formatting.Indented);
+        var serializedData = JsonConvert.SerializeObject(data, Formatting.None);
         if (serializedData == UpdatedTitleJson) return;
 
         if (Config.EnableDebugLogging)
@@ -301,6 +336,11 @@ public class Updater : IDisposable
             PluginLog.Warning(message);
         }
 
+        if (Config.EnableDebugLogging)
+        {
+            ChatGui.PrintError($"SpotifyHonorific: {message}");
+        }
+
         CurrentAccessToken = null;
         Spotify = null;
         CurrentTrackId = null;
@@ -308,14 +348,17 @@ public class Updater : IDisposable
         ClearTitle();
     }
 
-    private async Task<SpotifyClient?> GetSpotifyClient()
+    private async Task<SpotifyClient?> GetSpotifyClient(CancellationToken cancellationToken = default)
     {
-        if (Config.SpotifyRefreshToken.IsNullOrWhitespace() || Config.SpotifyClientId.IsNullOrWhitespace() || Config.SpotifyClientSecret.IsNullOrWhitespace())
+        var (refreshToken, clientId, clientSecret, lastAuthTime) = Config.WithLock(() =>
+            (Config.SpotifyRefreshToken, Config.SpotifyClientId, Config.SpotifyClientSecret, Config.LastSpotifyAuthTime));
+
+        if (refreshToken.IsNullOrWhitespace() || clientId.IsNullOrWhitespace() || clientSecret.IsNullOrWhitespace())
         {
             return null;
         }
 
-        if (Spotify != null && CurrentAccessToken != null && Config.LastSpotifyAuthTime.AddMinutes(55) > DateTime.Now)
+        if (Spotify != null && CurrentAccessToken != null && lastAuthTime.AddMinutes(TOKEN_REFRESH_WINDOW_MINUTES) > DateTime.Now)
         {
             return Spotify;
         }
@@ -324,18 +367,21 @@ public class Updater : IDisposable
         try
         {
             var response = await new OAuthClient().RequestToken(
-                new PKCETokenRefreshRequest(Config.SpotifyClientId, Config.SpotifyRefreshToken)
+                new PKCETokenRefreshRequest(clientId, refreshToken),
+                cancellationToken
             ).ConfigureAwait(false);
 
             CurrentAccessToken = response.AccessToken;
 
-            if (!string.IsNullOrEmpty(response.RefreshToken))
+            Config.WithLock(() =>
             {
-                Config.SpotifyRefreshToken = response.RefreshToken;
-            }
-
-            Config.LastSpotifyAuthTime = DateTime.Now;
-            Config.Save();
+                if (!string.IsNullOrEmpty(response.RefreshToken))
+                {
+                    Config.SpotifyRefreshToken = response.RefreshToken;
+                }
+                Config.LastSpotifyAuthTime = DateTime.Now;
+                Config.Save();
+            });
 
             Spotify = new SpotifyClient(CurrentAccessToken);
             return Spotify;
@@ -343,8 +389,11 @@ public class Updater : IDisposable
         catch (Exception e)
         {
             PluginLog.Error(e, "Failed to refresh Spotify token!");
-            Config.SpotifyRefreshToken = string.Empty;
-            Config.Save();
+            Config.WithLock(() =>
+            {
+                Config.SpotifyRefreshToken = string.Empty;
+                Config.Save();
+            });
             return null;
         }
     }
