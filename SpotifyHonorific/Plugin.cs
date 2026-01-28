@@ -19,7 +19,7 @@ public sealed class Plugin : IDalamudPlugin
     [PluginService] internal static IFramework Framework { get; private set; } = null!;
 
     private const string CommandName = "/spotifyhonorific";
-    private const string CommandHelpMessage = $"Use {CommandName} config to open the settings window.";
+    private const string CommandHelpMessage = $"Use {CommandName} config to open the settings window, or {CommandName} stats to view performance statistics.";
 
     public Config Config { get; init; }
 
@@ -62,9 +62,16 @@ public sealed class Plugin : IDalamudPlugin
 
     private void OnCommand(string command, string args)
     {
-        if (args.AsSpan().Trim().Equals("config", StringComparison.OrdinalIgnoreCase))
+        var trimmedArgs = args.AsSpan().Trim();
+
+        if (trimmedArgs.Equals("config", StringComparison.OrdinalIgnoreCase))
         {
             ToggleConfigUI();
+        }
+        else if (trimmedArgs.Equals("stats", StringComparison.OrdinalIgnoreCase))
+        {
+            var stats = Updater.GetPerformanceStats();
+            ChatGui.Print(stats);
         }
         else
         {
