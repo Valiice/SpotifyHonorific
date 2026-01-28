@@ -44,7 +44,7 @@ public class ConfigTests
     }
 
     [Fact]
-    public void Config_WithLock_ShouldHandleMultipleThreads()
+    public async Task Config_WithLock_ShouldHandleMultipleThreads()
     {
         // Arrange
         var mockInterface = Substitute.For<IDalamudPluginInterface>();
@@ -55,19 +55,19 @@ public class ConfigTests
         const int threadCount = 100;
 
         // Act - Simulate multiple threads accessing config
-        for (int i = 0; i < threadCount; i++)
+        for (var i = 0; i < threadCount; i++)
         {
             tasks.Add(Task.Run(() =>
             {
                 config.WithLock(() =>
                 {
                     counter++;
-                    Thread.Sleep(1); // Simulate work
+                    Thread.Sleep(1);
                 });
             }));
         }
 
-        Task.WaitAll(tasks.ToArray());
+        await Task.WhenAll(tasks);
 
         // Assert - All increments should have succeeded without race conditions
         counter.Should().Be(threadCount);
@@ -136,7 +136,7 @@ public class ConfigTests
     }
 
     [Fact]
-    public void Config_ConcurrentReadWrite_ShouldBeSafe()
+    public async Task Config_ConcurrentReadWrite_ShouldBeSafe()
     {
         // Arrange
         var mockInterface = Substitute.For<IDalamudPluginInterface>();
@@ -149,7 +149,7 @@ public class ConfigTests
         var tasks = new List<Task>();
 
         // Writer tasks
-        for (int i = 0; i < 10; i++)
+        for (var i = 0; i < 10; i++)
         {
             var value = $"value_{i}";
             tasks.Add(Task.Run(() =>
@@ -164,7 +164,7 @@ public class ConfigTests
         }
 
         // Reader tasks
-        for (int i = 0; i < 20; i++)
+        for (var i = 0; i < 20; i++)
         {
             tasks.Add(Task.Run(() =>
             {
@@ -176,12 +176,11 @@ public class ConfigTests
             }));
         }
 
-        Task.WaitAll(tasks.ToArray());
+        await Task.WhenAll(tasks);
 
         // Assert
         writeCount.Should().Be(10);
         readValues.Should().HaveCount(20);
-        // All read values should be valid (not corrupted)
         readValues.Should().OnlyContain(v => string.IsNullOrEmpty(v) || v.StartsWith("value_"));
     }
 }

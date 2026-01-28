@@ -31,7 +31,7 @@ public class IntegrationTests
         {
             Enabled = true,
             ActiveConfigName = "Test Spotify",
-            ActivityConfigs = new List<ActivityConfig> { activityConfig }
+            ActivityConfigs = [activityConfig]
         };
         config.Initialize(mockInterface);
 
@@ -70,7 +70,7 @@ public class IntegrationTests
     }
 
     [Fact]
-    public void ThreadSafeConfig_WithConcurrentActivityConfigChanges_ShouldNotCorrupt()
+    public async Task ThreadSafeConfig_WithConcurrentActivityConfigChanges_ShouldNotCorrupt()
     {
         // Arrange
         var mockInterface = Substitute.For<IDalamudPluginInterface>();
@@ -82,8 +82,8 @@ public class IntegrationTests
 
         var tasks = new List<Task>();
 
-        // Act - Simulate concurrent modifications
-        for (int i = 0; i < 50; i++)
+        // Act
+        for (var i = 0; i < 50; i++)
         {
             var index = i;
             tasks.Add(Task.Run(() =>
@@ -104,7 +104,7 @@ public class IntegrationTests
             }));
         }
 
-        Task.WaitAll(tasks.ToArray());
+        await Task.WhenAll(tasks);
 
         // Assert
         config.ActivityConfigs.Should().HaveCountGreaterThan(1);
@@ -121,7 +121,6 @@ public class IntegrationTests
 
         // Act
         config.ActivityConfigs.AddRange(ActivityConfig.GetDefaults());
-
         if (string.IsNullOrEmpty(config.ActiveConfigName) && config.ActivityConfigs.Count > 0)
         {
             config.ActiveConfigName = config.ActivityConfigs[0].Name;
@@ -141,13 +140,12 @@ public class IntegrationTests
         var originalCount = original.Count;
         var originalFirstName = original[0].Name;
 
-        // Act - Clone and modify
+        // Act
         var cloned = new List<ActivityConfig>();
         foreach (var config in original)
         {
             cloned.Add(config.Clone());
         }
-
         cloned[0].Name = "MODIFIED";
         cloned.Add(new ActivityConfig { Name = "NEW" });
 
@@ -159,9 +157,6 @@ public class IntegrationTests
     }
 }
 
-/// <summary>
-/// Performance benchmark tests
-/// </summary>
 public class PerformanceBenchmarkTests
 {
     [Fact]
@@ -175,14 +170,14 @@ public class PerformanceBenchmarkTests
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
 
         // Act
-        for (int i = 0; i < iterations; i++)
+        for (var i = 0; i < iterations; i++)
         {
             config.WithLock(() => config.Enabled);
         }
 
         stopwatch.Stop();
 
-        // Assert - 10k lock operations should complete in under 100ms
+        // Assert
         stopwatch.ElapsedMilliseconds.Should().BeLessThan(100);
     }
 
@@ -202,14 +197,14 @@ public class PerformanceBenchmarkTests
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
 
         // Act
-        for (int i = 0; i < iterations; i++)
+        for (var i = 0; i < iterations; i++)
         {
-            var clone = original.Clone();
+            _ = original.Clone();
         }
 
         stopwatch.Stop();
 
-        // Assert - 10k clones should complete in under 50ms
+        // Assert
         stopwatch.ElapsedMilliseconds.Should().BeLessThan(50);
     }
 
@@ -221,21 +216,18 @@ public class PerformanceBenchmarkTests
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
 
         // Act
-        for (int i = 0; i < iterations; i++)
+        for (var i = 0; i < iterations; i++)
         {
-            var defaults = ActivityConfig.GetDefaults();
+            _ = ActivityConfig.GetDefaults();
         }
 
         stopwatch.Stop();
 
-        // Assert - 1k default generations should complete in under 50ms
+        // Assert
         stopwatch.ElapsedMilliseconds.Should().BeLessThan(50);
     }
 }
 
-/// <summary>
-/// Edge case and boundary tests
-/// </summary>
 public class EdgeCaseTests
 {
     [Fact]
@@ -298,15 +290,15 @@ public class EdgeCaseTests
         var mockInterface = Substitute.For<IDalamudPluginInterface>();
         var config = new Config();
         config.Initialize(mockInterface);
-        for (int i = 0; i < 100; i++)
+        for (var i = 0; i < 100; i++)
         {
             config.ActivityConfigs.Add(new ActivityConfig { Name = $"Config {i}" });
         }
 
         var tasks = new List<Task>();
 
-        // Act - Concurrent deletions
-        for (int i = 0; i < 50; i++)
+        // Act
+        for (var i = 0; i < 50; i++)
         {
             var index = i;
             tasks.Add(Task.Run(() =>
@@ -321,8 +313,8 @@ public class EdgeCaseTests
             }));
         }
 
-        // Assert - Should not throw
-        var action = () => Task.WaitAll(tasks.ToArray());
+        // Assert
+        var action = () => Task.WaitAll([.. tasks]);
         action.Should().NotThrow();
     }
 }

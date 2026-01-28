@@ -125,13 +125,13 @@ public class ActivityConfigTests
         var originalCount = firstCall.Count;
         var originalName = firstCall[0].Name;
 
-        // Act - Modify the returned list
+        // Act
         firstCall[0].Name = "Modified Name";
         firstCall.Add(new ActivityConfig { Name = "Added Config" });
 
         var secondCall = ActivityConfig.GetDefaults();
 
-        // Assert - Second call should return unmodified defaults
+        // Assert
         secondCall.Should().HaveCount(originalCount);
         secondCall[0].Name.Should().Be(originalName);
     }
