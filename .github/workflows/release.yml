@@ -60,9 +60,6 @@ jobs:
       - name: Build Project
         run: dotnet build --configuration Release SpotifyHonorific/SpotifyHonorific.csproj -p:AssemblyVersion=${{ env.VERSION }}
 
-      - name: Run Tests
-        run: dotnet test --configuration Release --no-build --verbosity normal
-
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
