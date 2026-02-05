@@ -1,3 +1,4 @@
+using Dalamud.Interface.Colors;
 using Dalamud.Interface.Utility;
 using Dalamud.Bindings.ImGui;
 using System.Numerics;
@@ -6,6 +7,26 @@ namespace SpotifyHonorific.Utils;
 
 public class ImGuiHelper
 {
+    /// <summary>
+    /// Displays wrapped text in red (error) color.
+    /// </summary>
+    public static void TextError(string text)
+    {
+        ImGui.PushStyleColor(ImGuiCol.Text, ImGuiColors.DalamudRed);
+        ImGui.TextWrapped(text);
+        ImGui.PopStyleColor();
+    }
+
+    /// <summary>
+    /// Displays wrapped text in orange (warning) color.
+    /// </summary>
+    public static void TextWarning(string text)
+    {
+        ImGui.PushStyleColor(ImGuiCol.Text, ImGuiColors.DalamudOrange);
+        ImGui.TextWrapped(text);
+        ImGui.PopStyleColor();
+    }
+
     // Source: https://github.com/Caraxi/Honorific/blob/1.4.1.0/ConfigWindow.cs#L826
     private Vector3 _editingColour = Vector3.One;
     public bool DrawColorPicker(string label, ref Vector3? color, Vector2 checkboxSize)
