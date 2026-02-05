@@ -3,6 +3,7 @@ using Dalamud.IoC;
 using Dalamud.Plugin;
 using Dalamud.Interface.Windowing;
 using Dalamud.Plugin.Services;
+using SpotifyHonorific.Authentication;
 using SpotifyHonorific.Windows;
 using SpotifyHonorific.Updaters;
 using SpotifyHonorific.Activities;
@@ -26,7 +27,7 @@ public sealed class Plugin : IDalamudPlugin
     public readonly WindowSystem WindowSystem = new("SpotifyHonorific");
     private ConfigWindow ConfigWindow { get; init; }
     private Updater Updater { get; init; }
-
+    private SpotifyAuthenticator SpotifyAuthenticator { get; init; }
 
     public Plugin()
     {
@@ -40,7 +41,8 @@ public sealed class Plugin : IDalamudPlugin
         }
 
         Updater = new(ChatGui, Config, Framework, PluginInterface, PluginLog);
-        ConfigWindow = new ConfigWindow(Config, new(), Updater);
+        SpotifyAuthenticator = new SpotifyAuthenticator(Config, PluginLog);
+        ConfigWindow = new ConfigWindow(Config, new(), Updater, SpotifyAuthenticator);
 
         WindowSystem.AddWindow(ConfigWindow);
         CommandManager.AddHandler(CommandName, new CommandInfo(OnCommand)
@@ -57,6 +59,7 @@ public sealed class Plugin : IDalamudPlugin
     {
         WindowSystem.RemoveAllWindows();
         CommandManager.RemoveHandler(CommandName);
+        SpotifyAuthenticator.Dispose();
         Updater.Dispose();
     }
 
