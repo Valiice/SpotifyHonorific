@@ -2,25 +2,20 @@ using Dalamud.Interface.Colors;
 using Dalamud.Interface.Windowing;
 using Dalamud.Utility;
 using SpotifyHonorific.Activities;
+using SpotifyHonorific.Authentication;
 using SpotifyHonorific.Updaters;
 using SpotifyHonorific.Utils;
 using Dalamud.Bindings.ImGui;
 using System.Numerics;
 using Scriban;
 using Scriban.Helpers;
-using SpotifyAPI.Web.Auth;
-using SpotifyAPI.Web;
 using System;
-using System.Linq;
 using System.Threading.Tasks;
-using System.Threading;
-using System.Collections.Generic;
 
 namespace SpotifyHonorific.Windows;
 
 public class ConfigWindow : Window
 {
-    private const int SPOTIFY_AUTH_TIMEOUT_MINUTES = 1;
     private const int SPOTIFY_CLIENT_ID_MAX_LENGTH = 100;
     private const int SPOTIFY_CLIENT_SECRET_MAX_LENGTH = 100;
     private const ushort MAX_INPUT_LENGTH = ushort.MaxValue;
@@ -28,10 +23,10 @@ public class ConfigWindow : Window
     private Config Config { get; init; }
     private ImGuiHelper ImGuiHelper { get; init; }
     private Updater Updater { get; init; }
+    private SpotifyAuthenticator SpotifyAuthenticator { get; init; }
 
     private string _spotifyClientIdBuffer = string.Empty;
     private string _spotifyClientSecretBuffer = string.Empty;
-    private static PKCECallbackActivator? SpotifyAuthServer;
 
     private string _lastAuthTimeString = string.Empty;
     private DateTime _cachedAuthTime;
@@ -42,7 +37,7 @@ public class ConfigWindow : Window
     private static readonly string RecreateText = "Recreate Defaults";
     private static readonly System.Reflection.PropertyInfo[] UpdaterContextProperties = typeof(UpdaterContext).GetProperties();
 
-    public ConfigWindow(Config config, ImGuiHelper imGuiHelper, Updater updater) : base("Spotify Activity Honorific Config##configWindow")
+    public ConfigWindow(Config config, ImGuiHelper imGuiHelper, Updater updater, SpotifyAuthenticator spotifyAuthenticator) : base("Spotify Activity Honorific Config##configWindow")
     {
         SizeConstraints = new WindowSizeConstraints
         {
@@ -53,6 +48,7 @@ public class ConfigWindow : Window
         Config = config;
         ImGuiHelper = imGuiHelper;
         Updater = updater;
+        SpotifyAuthenticator = spotifyAuthenticator;
 
         _spotifyClientIdBuffer = Config.SpotifyClientId;
         _spotifyClientSecretBuffer = Config.SpotifyClientSecret;
@@ -76,16 +72,12 @@ public class ConfigWindow : Window
             return; // No errors, don't display anything
         }
 
-        ImGui.PushStyleColor(ImGuiCol.Text, ImGuiColors.DalamudRed);
-        ImGui.TextWrapped("⚠ Configuration Issues:");
-        ImGui.PopStyleColor();
+        ImGuiHelper.TextError("⚠ Configuration Issues:");
 
         ImGui.Indent(10);
         foreach (var error in errors)
         {
-            ImGui.PushStyleColor(ImGuiCol.Text, ImGuiColors.DalamudOrange);
-            ImGui.TextWrapped($"• {error}");
-            ImGui.PopStyleColor();
+            ImGuiHelper.TextWarning($"• {error}");
         }
         ImGui.Unindent(10);
         ImGui.Separator();
@@ -147,15 +139,7 @@ public class ConfigWindow : Window
             _cachedConfigCount = Config.ActivityConfigs.Count;
         }
 
-        var currentIndex = 0;
-        for (var i = 0; i < Config.ActivityConfigs.Count; i++)
-        {
-            if (Config.ActivityConfigs[i].Name == Config.ActiveConfigName)
-            {
-                currentIndex = i;
-                break;
-            }
-        }
+        var currentIndex = ValidationHelper.FindActiveConfigIndex(Config.ActivityConfigs, Config.ActiveConfigName);
 
         if (ImGui.Combo("##activeConfig", ref currentIndex, _cachedConfigNames, _cachedConfigNames.Length))
         {
@@ -424,14 +408,7 @@ public class ConfigWindow : Window
             var titleTemplate = Template.Parse(activityConfig.TitleTemplate);
             if (titleTemplate.HasErrors)
             {
-                var errorMessages = new List<string>(titleTemplate.Messages.Count);
-                foreach (var msg in titleTemplate.Messages)
-                {
-                    errorMessages.Add(msg.Message);
-                }
-                ImGui.PushStyleColor(ImGuiCol.Text, ImGuiColors.DalamudRed);
-                ImGui.TextWrapped($"Template Error: {string.Join(", ", errorMessages)}");
-                ImGui.PopStyleColor();
+                ImGuiHelper.TextError($"Template Error: {TemplateHelper.GetTemplateErrors(titleTemplate)}");
             }
             else
             {
@@ -456,17 +433,13 @@ public class ConfigWindow : Window
 
                 if (length > 32)
                 {
-                    ImGui.PushStyleColor(ImGuiCol.Text, ImGuiColors.DalamudOrange);
-                    ImGui.TextWrapped("⚠ Title exceeds 32 character limit and will be rejected by Honorific plugin.");
-                    ImGui.PopStyleColor();
+                    ImGuiHelper.TextWarning("⚠ Title exceeds 32 character limit and will be rejected by Honorific plugin.");
                 }
             }
         }
         catch (Exception ex)
         {
-            ImGui.PushStyleColor(ImGuiCol.Text, ImGuiColors.DalamudRed);
-            ImGui.TextWrapped($"Preview Error: {ex.Message}");
-            ImGui.PopStyleColor();
+            ImGuiHelper.TextError($"Preview Error: {ex.Message}");
         }
 
         ImGui.Unindent();
@@ -572,58 +545,11 @@ public class ConfigWindow : Window
 
     private async Task StartSpotifyAuth()
     {
-        try
-        {
-            var serverUri = new Uri("http://127.0.0.1:5000");
-            SpotifyAuthServer?.Dispose();
-            SpotifyAuthServer = new PKCECallbackActivator(serverUri, "callback");
-
-            await SpotifyAuthServer.Start().ConfigureAwait(false);
-
-            var (verifier, challenge) = PKCEUtil.GenerateCodes();
-            var loginRequest = new LoginRequest(SpotifyAuthServer.RedirectUri, Config.SpotifyClientId, LoginRequest.ResponseType.Code)
-            {
-                CodeChallenge = challenge,
-                CodeChallengeMethod = "S256",
-                Scope = [Scopes.UserReadCurrentlyPlaying, Scopes.UserReadPlaybackState]
-            };
-
-            BrowserUtil.Open(loginRequest.ToUri());
-
-            using var timeoutCts = new CancellationTokenSource(TimeSpan.FromMinutes(SPOTIFY_AUTH_TIMEOUT_MINUTES));
-            var context = await SpotifyAuthServer.ReceiveContext(timeoutCts.Token).ConfigureAwait(false);
-
-            var code = context.Request.QueryString["code"];
-            if (string.IsNullOrEmpty(code))
-            {
-                Plugin.PluginLog.Error("Spotify auth failed: No code received.");
-                return;
-            }
-
-            var tokenResponse = await new OAuthClient().RequestToken(
-                new PKCETokenRequest(Config.SpotifyClientId, code, SpotifyAuthServer.RedirectUri, verifier)
-            ).ConfigureAwait(false);
-
-            Config.SpotifyRefreshToken = tokenResponse.RefreshToken;
-            Config.LastSpotifyAuthTime = DateTime.Now;
-            Config.Save();
-
-            Plugin.PluginLog.Information("Successfully authenticated with Spotify!");
-        }
-        catch (Exception e)
-        {
-            Plugin.PluginLog.Error(e, "Spotify authentication failed");
-        }
-        finally
-        {
-            SpotifyAuthServer?.Dispose();
-            SpotifyAuthServer = null;
-        }
+        await SpotifyAuthenticator.AuthenticateAsync().ConfigureAwait(false);
     }
 
     public override void OnClose()
     {
-        SpotifyAuthServer?.Dispose();
-        SpotifyAuthServer = null;
+        SpotifyAuthenticator.Dispose();
     }
 }
