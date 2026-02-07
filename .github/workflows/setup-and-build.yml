@@ -14,7 +14,7 @@ on:
         required: false
 
 jobs:
-  build:
+  setup-and-build:
     runs-on: ubuntu-latest
     env:
       DALAMUD_HOME: /tmp/dalamud
