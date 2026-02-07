@@ -62,10 +62,13 @@ jobs:
           TAG="${{ needs.prepare.outputs.tag_name }}"
           PREV_TAG=$(git describe --tags --abbrev=0 "$TAG^" 2>/dev/null || true)
           if [ -z "$PREV_TAG" ]; then
-            git log --pretty=format:"- %s" "$TAG" > changelog.txt 2>/dev/null || git log --pretty=format:"- %s" HEAD > changelog.txt
+            RANGE="$TAG"
           else
-            git log --pretty=format:"- %s" "$PREV_TAG..$TAG" > changelog.txt
+            RANGE="$PREV_TAG..$TAG"
           fi
+          git log --no-merges --pretty=format:"- %s" "$RANGE" \
+            | grep -vi "^- Bump " \
+            > changelog.txt 2>/dev/null || echo "- Release $TAG" > changelog.txt
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
@@ -81,8 +84,16 @@ jobs:
 
       - name: Dispatch Plugin Repo Update
         run: |
-          curl -X POST \
+          CHANGELOG=$(cat changelog.txt)
+          jq -n \
+            --arg plugin "SpotifyHonorific" \
+            --arg version "${{ needs.prepare.outputs.version }}" \
+            --arg tag "${{ needs.prepare.outputs.tag_name }}" \
+            --arg repo "${{ github.repository }}" \
+            --arg changelog "$CHANGELOG" \
+            '{"event_type":"plugin-release","client_payload":{plugin:$plugin,version:$version,tag:$tag,repo:$repo,changelog:$changelog}}' \
+          | curl -X POST \
             -H "Authorization: token ${{ secrets.PAT_TOKEN }}" \
             -H "Accept: application/vnd.github+json" \
             https://api.github.com/repos/Valiice/DalamudPluginRepo/dispatches \
-            -d '{"event_type":"plugin-release","client_payload":{"plugin":"SpotifyHonorific","version":"${{ needs.prepare.outputs.version }}","tag":"${{ needs.prepare.outputs.tag_name }}","repo":"${{ github.repository }}"}}'
+            -d @-
