@@ -15,61 +15,74 @@ permissions:
   contents: write
 
 jobs:
-  Build:
+  prepare:
     runs-on: ubuntu-latest
-    env:
-      DALAMUD_HOME: /tmp/dalamud
-      DALAMUD_ARCHIVE_URL: ${{ vars.DALAMUD_ARCHIVE_URL || 'https://goatcorp.github.io/dalamud-distrib/latest.zip' }}
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      tag_name: ${{ steps.version.outputs.tag_name }}
+    steps:
+      - name: Determine Version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "version=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+            echo "tag_name=v${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+          else
+            VERSION="${{ github.ref_name }}"
+            echo "version=${VERSION#v}" >> $GITHUB_OUTPUT
+            echo "tag_name=${{ github.ref_name }}" >> $GITHUB_OUTPUT
+          fi
+
+  build:
+    needs: prepare
+    uses: ./.github/workflows/setup-and-build.yml
+    with:
+      configuration: Release
+      version: ${{ needs.prepare.outputs.version }}
+    secrets:
+      token: ${{ secrets.PAT_TOKEN }}
+
+  release:
+    needs: [ prepare, build ]
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v6
-
-      - name: Set up .NET
-        uses: actions/setup-dotnet@v5
         with:
-          dotnet-version: 10.0.x
-          cache: true
-          cache-dependency-path: '**/packages.lock.json'
+          fetch-depth: 0
 
-      - name: Cache Dalamud
-        uses: actions/cache@v4
-        id: cache-dalamud
+      - name: Download Release Asset
+        uses: actions/download-artifact@v6
         with:
-          path: ${{ env.DALAMUD_HOME }}
-          key: dalamud-${{ env.DALAMUD_ARCHIVE_URL }}
+          name: SpotifyHonorific-release
+          path: release
 
-      - name: Download Dalamud Latest
-        if: steps.cache-dalamud.outputs.cache-hit != 'true'
+      - name: Generate Changelog
         run: |
-          wget ${{ env.DALAMUD_ARCHIVE_URL }} -O ${{ env.DALAMUD_HOME }}.zip
-          unzip ${{ env.DALAMUD_HOME }}.zip -d ${{ env.DALAMUD_HOME }}
-
-      - name: Determine Version
-        id: get_version
-        run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            # Manual run: use the input version
-            echo "VERSION=${{ github.event.inputs.version }}" >> $GITHUB_ENV
-            echo "TAG_NAME=v${{ github.event.inputs.version }}" >> $GITHUB_ENV
+          TAG="${{ needs.prepare.outputs.tag_name }}"
+          PREV_TAG=$(git describe --tags --abbrev=0 "$TAG^" 2>/dev/null || true)
+          if [ -z "$PREV_TAG" ]; then
+            git log --pretty=format:"- %s" "$TAG" > changelog.txt 2>/dev/null || git log --pretty=format:"- %s" HEAD > changelog.txt
           else
-            # Tag push: strip the 'v' prefix
-            echo "VERSION=${GITHUB_REF_NAME#v}" >> $GITHUB_ENV
-            echo "TAG_NAME=${GITHUB_REF_NAME}" >> $GITHUB_ENV
+            git log --pretty=format:"- %s" "$PREV_TAG..$TAG" > changelog.txt
           fi
-
-      - name: Build Project
-        run: dotnet build --configuration Release SpotifyHonorific/SpotifyHonorific.csproj -p:AssemblyVersion=${{ env.VERSION }}
-
-      - name: Rename Release Asset
-        run: mv SpotifyHonorific/bin/Release/SpotifyHonorific/latest.zip SpotifyHonorific/bin/Release/SpotifyHonorific/SpotifyHonorific.zip
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
-          name: ${{ env.TAG_NAME }}
-          tag_name: ${{ env.TAG_NAME }}
+          name: ${{ needs.prepare.outputs.tag_name }}
+          tag_name: ${{ needs.prepare.outputs.tag_name }}
           draft: false
           prerelease: false
-          files: SpotifyHonorific/bin/Release/SpotifyHonorific/SpotifyHonorific.zip
+          body_path: changelog.txt
+          files: release/SpotifyHonorific.zip
         env:
           GITHUB_TOKEN: ${{ github.token }}
+
+      - name: Dispatch Plugin Repo Update
+        run: |
+          curl -X POST \
+            -H "Authorization: token ${{ secrets.PAT_TOKEN }}" \
+            -H "Accept: application/vnd.github+json" \
+            https://api.github.com/repos/Valiice/DalamudPluginRepo/dispatches \
+            -d '{"event_type":"plugin-release","client_payload":{"plugin":"SpotifyHonorific","version":"${{ needs.prepare.outputs.version }}","tag":"${{ needs.prepare.outputs.tag_name }}","repo":"${{ github.repository }}"}}'
