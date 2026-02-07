@@ -1,0 +1,76 @@
+name: Setup and Build
+
+on:
+  workflow_call:
+    inputs:
+      configuration:
+        type: string
+        default: "Release"
+      version:
+        type: string
+        default: ""
+    secrets:
+      token:
+        required: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      DALAMUD_HOME: /tmp/dalamud
+      DALAMUD_ARCHIVE_URL: ${{ vars.DALAMUD_ARCHIVE_URL || 'https://goatcorp.github.io/dalamud-distrib/latest.zip' }}
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v6
+        with:
+          token: ${{ secrets.token || github.token }}
+          fetch-depth: 0
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.x
+          cache: true
+          cache-dependency-path: '**/packages.lock.json'
+
+      - name: Cache Dalamud
+        uses: actions/cache@v5
+        id: cache-dalamud
+        with:
+          path: ${{ env.DALAMUD_HOME }}
+          key: dalamud-${{ env.DALAMUD_ARCHIVE_URL }}
+
+      - name: Download Dalamud Latest
+        if: steps.cache-dalamud.outputs.cache-hit != 'true'
+        run: |
+          wget ${{ env.DALAMUD_ARCHIVE_URL }} -O ${{ env.DALAMUD_HOME }}.zip
+          unzip ${{ env.DALAMUD_HOME }}.zip -d ${{ env.DALAMUD_HOME }}
+
+      - name: Build Project
+        run: |
+          BUILD_ARGS="--configuration ${{ inputs.configuration }} SpotifyHonorific/SpotifyHonorific.csproj"
+          if [ -n "${{ inputs.version }}" ]; then
+            BUILD_ARGS="$BUILD_ARGS -p:AssemblyVersion=${{ inputs.version }}"
+          fi
+          dotnet build $BUILD_ARGS
+
+      - name: Upload Build Artifact
+        uses: actions/upload-artifact@v6
+        with:
+          name: SpotifyHonorific
+          retention-days: 14
+          path: |
+            SpotifyHonorific/bin/${{ inputs.configuration }}/*
+            !SpotifyHonorific/bin/${{ inputs.configuration }}/SpotifyHonorific/
+
+      - name: Rename Release Asset
+        if: inputs.version != ''
+        run: mv SpotifyHonorific/bin/${{ inputs.configuration }}/SpotifyHonorific/latest.zip SpotifyHonorific/bin/${{ inputs.configuration }}/SpotifyHonorific/SpotifyHonorific.zip
+
+      - name: Upload Release Asset
+        if: inputs.version != ''
+        uses: actions/upload-artifact@v6
+        with:
+          name: SpotifyHonorific-release
+          retention-days: 1
+          path: SpotifyHonorific/bin/${{ inputs.configuration }}/SpotifyHonorific/SpotifyHonorific.zip
