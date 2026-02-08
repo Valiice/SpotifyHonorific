@@ -1,4 +1,6 @@
+using Dalamud.Interface;
 using Dalamud.Interface.Colors;
+using Dalamud.Interface.Components;
 using Dalamud.Interface.Windowing;
 using Dalamud.Utility;
 using SpotifyHonorific.Activities;
@@ -33,6 +35,7 @@ public class ConfigWindow : Window
     private string? _newlyCreatedTabName;
     private string[] _cachedConfigNames = [];
     private int _cachedConfigCount;
+    private float _kofiButtonWidth;
 
     private static readonly string RecreateText = "Recreate Defaults";
     private static readonly System.Reflection.PropertyInfo[] UpdaterContextProperties = typeof(UpdaterContext).GetProperties();
@@ -56,6 +59,7 @@ public class ConfigWindow : Window
 
     public override void Draw()
     {
+        DrawKofiButton();
         DrawMainSettings();
         ImGui.Separator();
         DrawSpotifySetup();
@@ -63,6 +67,24 @@ public class ConfigWindow : Window
         DrawValidationErrors();
         ImGui.Spacing();
         DrawActivityConfigTabs();
+    }
+
+    private void DrawKofiButton()
+    {
+        var startPos = ImGui.GetCursorPos();
+        if (_kofiButtonWidth > 0)
+        {
+            ImGui.SetCursorPosX(ImGui.GetWindowContentRegionMax().X - _kofiButtonWidth);
+        }
+        if (ImGuiComponents.IconButtonWithText(FontAwesomeIcon.Coffee, "Support",
+            new Vector4(1.0f, 0.35f, 0.35f, 0.9f),
+            new Vector4(1.0f, 0.25f, 0.25f, 1.0f),
+            new Vector4(1.0f, 0.35f, 0.35f, 0.75f)))
+        {
+            Dalamud.Utility.Util.OpenLink("https://ko-fi.com/valiice");
+        }
+        _kofiButtonWidth = ImGui.GetItemRectSize().X;
+        ImGui.SetCursorPos(startPos);
     }
 
     private void DrawValidationErrors()

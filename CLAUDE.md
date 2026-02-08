@@ -38,6 +38,10 @@ This is a **FFXIV Dalamud plugin** that updates a character's honorific title ba
 - **Token refresh**: Every 55 minutes (before 60-minute expiry)
 - **AFK threshold**: 30 seconds idle pauses polling
 
+## Code Style
+
+Follow **SoC** (Separation of Concerns), **KISS** (Keep It Simple), and **DRY** (Don't Repeat Yourself). Extract focused methods per concern, avoid unnecessary abstractions, and keep solutions minimal. Prioritize readability — use clear, descriptive method and variable names, and break logic into well-named methods.
+
 ## Tech Stack
 
 - C# / .NET 10.0 (Windows, x64)
