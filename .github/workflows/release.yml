@@ -67,8 +67,11 @@ jobs:
             RANGE="$PREV_TAG..$TAG"
           fi
           git log --no-merges --pretty=format:"- %s" "$RANGE" \
-            | grep -vi "^- Bump " \
-            > changelog.txt 2>/dev/null || echo "- Release $TAG" > changelog.txt
+            | grep -viE "^- (Bump |Merge |Release v)" \
+            > changelog.txt || true
+          if [ ! -s changelog.txt ]; then
+            echo "- Release $TAG" > changelog.txt
+          fi
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
