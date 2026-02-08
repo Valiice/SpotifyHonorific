@@ -60,11 +60,13 @@ jobs:
       - name: Generate Changelog
         run: |
           TAG="${{ needs.prepare.outputs.tag_name }}"
-          PREV_TAG=$(git describe --tags --abbrev=0 "$TAG^" 2>/dev/null || true)
+          # Use the tag if it exists as a git ref, otherwise use HEAD (workflow_dispatch)
+          REF=$(git rev-parse "$TAG" 2>/dev/null || echo "HEAD")
+          PREV_TAG=$(git describe --tags --abbrev=0 "$REF^" 2>/dev/null || true)
           if [ -z "$PREV_TAG" ]; then
-            RANGE="$TAG"
+            RANGE="$REF"
           else
-            RANGE="$PREV_TAG..$TAG"
+            RANGE="$PREV_TAG..$REF"
           fi
           git log --no-merges --pretty=format:"- %s" "$RANGE" \
             | grep -viE "^- (Bump |Merge |Release v)" \
