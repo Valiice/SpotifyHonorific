@@ -4,15 +4,15 @@
     "net10.0-windows7.0": {
       "DalamudPackager": {
         "type": "Direct",
-        "requested": "[14.0.1, )",
-        "resolved": "14.0.1",
-        "contentHash": "y0WWyUE6dhpGdolK3iKgwys05/nZaVf4ZPtIjpLhJBZvHxkkiE23zYRo7K7uqAgoK/QvK5cqF6l3VG5AbgC6KA=="
+        "requested": "[14.0.2, )",
+        "resolved": "14.0.2",
+        "contentHash": "dQJeq+8eyHzra4Cg5eZ/3LAeS3/UpvvLriYJGSncMK9LqJ7Q4B6jwcOsxo3PfxVd15xj+IzVFxkPqIBmPQu8/w=="
       },
       "DotNet.ReproducibleBuilds": {
         "type": "Direct",
-        "requested": "[1.2.39, )",
-        "resolved": "1.2.39",
-        "contentHash": "fcFN01tDTIQqDuTwr1jUQK/geofiwjG5DycJQOnC72i1SsLAk1ELe+apBOuZ11UMQG8YKFZG1FgvjZPbqHyatg=="
+        "requested": "[2.0.2, )",
+        "resolved": "2.0.2",
+        "contentHash": "VaHoEN6YHp0jXucxm67vfuRy8zo9ufiKSuaZ4ZudRi8xmWcEFMKxfCsg2nvYNvdISFTURDu+IHqADGh53+Bamw=="
       },
       "Scriban": {
         "type": "Direct",
@@ -22,21 +22,21 @@
       },
       "SpotifyAPI.Web": {
         "type": "Direct",
-        "requested": "[7.2.1, )",
-        "resolved": "7.2.1",
-        "contentHash": "7yatLKdwPmigJ+GGPUHwZppYzWNIPOSrpA3KKK/kndJl657zm1yzaAQ7j2xy3G7lyiKsdRZtz4k6CpFN32pyng==",
+        "requested": "[7.3.0, )",
+        "resolved": "7.3.0",
+        "contentHash": "H64dJdu5po+plSeADUOL3YMhCQjjcNM5tB5xdSvOiETdmSjCwcQd4KM2F3kJLcq7nfY9JauH9H1KkWdIYoL2Bg==",
         "dependencies": {
           "Newtonsoft.Json": "13.0.3"
         }
       },
       "SpotifyAPI.Web.Auth": {
         "type": "Direct",
-        "requested": "[7.2.1, )",
-        "resolved": "7.2.1",
-        "contentHash": "/U/KCV4iBsG3rHBCDL7THKkJcNdfP0Lqhq87afKeTjP7EQGM5haDy6rNblZlL/t9RnK9+DFhWCdAKVQagDB6bg==",
+        "requested": "[7.3.0, )",
+        "resolved": "7.3.0",
+        "contentHash": "xO1eEpVTyoetXKsuvgMX7JGQVbbLN4walvUI3pXgLdei1QASJ5Dwnv80N4n5+Y5m4ck/pqqAq7fSfNyVyFKpoQ==",
         "dependencies": {
           "EmbedIO": "3.5.2",
-          "SpotifyAPI.Web": "7.2.1"
+          "SpotifyAPI.Web": "7.3.0"
         }
       },
       "EmbedIO": {
