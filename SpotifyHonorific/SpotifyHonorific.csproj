@@ -12,8 +12,8 @@
 
     <ItemGroup>
         <PackageReference Include="Scriban" Version="6.5.2" />
-        <PackageReference Include="SpotifyAPI.Web" Version="7.3.0" />
-        <PackageReference Include="SpotifyAPI.Web.Auth" Version="7.3.0" />
+        <PackageReference Include="SpotifyAPI.Web" Version="7.4.0" />
+        <PackageReference Include="SpotifyAPI.Web.Auth" Version="7.4.0" />
     </ItemGroup>
 
     <ItemGroup>
