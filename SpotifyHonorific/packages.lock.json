@@ -22,9 +22,9 @@
       },
       "SpotifyAPI.Web": {
         "type": "Direct",
-        "requested": "[7.3.0, )",
-        "resolved": "7.3.0",
-        "contentHash": "H64dJdu5po+plSeADUOL3YMhCQjjcNM5tB5xdSvOiETdmSjCwcQd4KM2F3kJLcq7nfY9JauH9H1KkWdIYoL2Bg==",
+        "requested": "[7.4.0, )",
+        "resolved": "7.4.0",
+        "contentHash": "1xewe5k+dy3cQJ9iIOmw4CUmBUnVZflSjcFL33636h/XuTLUnBKkKiB9dCeHJeVVtN0+on+t2Wy3haJBJMp3Vg==",
         "dependencies": {
           "Newtonsoft.Json": "13.0.3"
         }
