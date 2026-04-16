@@ -150,14 +150,21 @@ public class SpotifyPollingService
             _spotify = new SpotifyClient(_currentAccessToken);
             return _spotify;
         }
-        catch (Exception e)
+        catch (APIException e) when (e.Response?.StatusCode is HttpStatusCode.BadRequest or HttpStatusCode.Unauthorized)
         {
-            _pluginLog.Error(e, "Failed to refresh Spotify token!");
+            _pluginLog.Error(e, "Spotify rejected the refresh token, clearing authentication.");
             _config.WithLock(() =>
             {
                 _config.SpotifyRefreshToken = string.Empty;
                 _config.Save();
             });
+            return null;
+        }
+        catch (Exception e)
+        {
+            _pluginLog.Warning(e, "Transient error refreshing Spotify token, will retry next poll cycle.");
+            _spotify = null;
+            _currentAccessToken = null;
             return null;
         }
     }
