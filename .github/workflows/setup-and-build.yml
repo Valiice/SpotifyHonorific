@@ -55,7 +55,7 @@ jobs:
           dotnet build $BUILD_ARGS
 
       - name: Upload Build Artifact
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: SpotifyHonorific
           retention-days: 14
@@ -69,7 +69,7 @@ jobs:
 
       - name: Upload Release Asset
         if: inputs.version != ''
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: SpotifyHonorific-release
           retention-days: 1
