@@ -5,8 +5,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Build Commands
 
 ```bash
-# Build (requires Dalamud SDK - CI downloads it automatically)
+# Build entire solution — always use this to catch test compilation errors too
+dotnet build
+
+# Release build of plugin only (for packaging)
 dotnet build --configuration Release SpotifyHonorific/SpotifyHonorific.csproj
+
+# Run tests (also builds if needed)
+dotnet test
 
 # Restore dependencies
 dotnet restore

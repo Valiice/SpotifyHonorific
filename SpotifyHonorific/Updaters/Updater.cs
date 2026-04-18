@@ -247,7 +247,7 @@ public class Updater : IDisposable
         var title = _renderingService.RenderTitle(activityConfig, track, _updaterContext);
         if (title == null) return;
 
-        var serializedData = _renderingService.SerializeTitleData(title, activityConfig, _updaterContext);
+        var serializedData = _renderingService.SerializeTitleData(title, activityConfig, _updaterContext, _config.IsHonorificSupporter);
         if (serializedData == _updatedTitleJson) return;
 
         if (_config.EnableDebugLogging)

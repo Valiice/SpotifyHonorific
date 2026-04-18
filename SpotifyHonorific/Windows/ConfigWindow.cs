@@ -5,6 +5,7 @@ using Dalamud.Interface.Windowing;
 using Dalamud.Utility;
 using SpotifyHonorific.Activities;
 using SpotifyHonorific.Authentication;
+using SpotifyHonorific.Gradient;
 using SpotifyHonorific.Updaters;
 using SpotifyHonorific.Utils;
 using Dalamud.Bindings.ImGui;
@@ -134,6 +135,7 @@ public class ConfigWindow : Window
         {
             ImGui.SetTooltip("Prints detailed status information to the FFXIV plugin log (open with /xllog).\nThis is very spammy and should be kept off unless you are debugging.");
         }
+
 
         ImGui.Spacing();
         DrawActiveConfigSelector();
@@ -357,6 +359,9 @@ public class ConfigWindow : Window
                 activityConfig.RainbowMode = importedConfig.RainbowMode;
                 activityConfig.Color = importedConfig.Color;
                 activityConfig.Glow = importedConfig.Glow;
+                activityConfig.GradientColourSet = importedConfig.GradientColourSet;
+                activityConfig.GradientAnimationStyle = importedConfig.GradientAnimationStyle;
+                activityConfig.Color3 = importedConfig.Color3;
                 Config.Save();
                 Plugin.ChatGui.Print("✓ Config imported from clipboard!");
             }
@@ -556,12 +561,111 @@ public class ConfigWindow : Window
         }
         ImGui.EndDisabled();
 
-        ImGui.SameLine();
-        var glow = activityConfig.Glow;
-        if (ImGuiHelper.DrawColorPicker($"Glow###{activityConfigId}Glow", ref glow, checkboxSize))
+        // Preset gradients handle glow internally in Honorific; show picker only for no-gradient or two-color.
+        if (activityConfig.GradientColourSet == null || activityConfig.GradientColourSet == -1)
         {
-            activityConfig.Glow = glow;
+            ImGui.SameLine();
+            var glow = activityConfig.Glow;
+            var glowLabel = activityConfig.GradientColourSet == -1
+                ? $"Color 1###{activityConfigId}GradColor1"
+                : $"Glow###{activityConfigId}Glow";
+            if (ImGuiHelper.DrawColorPicker(glowLabel, ref glow, checkboxSize))
+            {
+                activityConfig.Glow = glow;
+                Config.Save();
+            }
+        }
+
+        DrawGradientSettings(activityConfig, activityConfigId, checkboxSize);
+    }
+
+    private void DrawGradientSettings(ActivityConfig activityConfig, string activityConfigId, Vector2 checkboxSize)
+    {
+        var currentLabel = activityConfig.GradientColourSet switch
+        {
+            null => "None",
+            -1   => "Two Color",
+            var i => GradientPresets.GetName(i!.Value)
+        };
+
+        ImGui.Text("Gradient Glow:");
+        ImGui.SameLine();
+        var isSupporter = Config.IsHonorificSupporter;
+        if (ImGui.Checkbox($"Supporter###{activityConfigId}Supporter", ref isSupporter))
+        {
+            Config.IsHonorificSupporter = isSupporter;
             Config.Save();
+        }
+        if (ImGui.IsItemHovered())
+            ImGui.SetTooltip("Tick this if you support Honorific on Ko-fi.\nUnlocks gradient glow styles (supporter-only feature in Honorific).");
+
+        if (!Config.IsHonorificSupporter)
+        {
+            ImGui.NewLine();
+            return;
+        }
+
+        ImGui.SameLine();
+        ImGui.SetNextItemWidth(160);
+        if (ImGui.BeginCombo($"###{activityConfigId}Gradient", currentLabel))
+        {
+            if (ImGui.Selectable("None", activityConfig.GradientColourSet == null))
+            {
+                activityConfig.GradientColourSet = null;
+                activityConfig.GradientAnimationStyle = null;
+                Config.Save();
+            }
+
+            if (ImGui.Selectable("Two Color", activityConfig.GradientColourSet == -1))
+            {
+                activityConfig.GradientColourSet = -1;
+                activityConfig.GradientAnimationStyle ??= GradientAnimationStyle.Wave;
+                activityConfig.Glow ??= new Vector3(0.81f, 0.35f, 0.82f);
+                activityConfig.Color3 ??= new Vector3(1f, 0.84f, 0f);
+                Config.Save();
+            }
+
+            ImGui.Separator();
+
+            for (var i = 0; i < GradientPresets.NumPresets; i++)
+            {
+                if (ImGui.Selectable(GradientPresets.GetName(i), activityConfig.GradientColourSet == i))
+                {
+                    activityConfig.GradientColourSet = i;
+                    activityConfig.GradientAnimationStyle ??= GradientAnimationStyle.Wave;
+                    Config.Save();
+                }
+            }
+
+            ImGui.EndCombo();
+        }
+
+        if (activityConfig.GradientColourSet == null) return;
+
+        ImGui.SameLine();
+        var animStyle = activityConfig.GradientAnimationStyle ?? GradientAnimationStyle.Wave;
+        foreach (var style in (GradientAnimationStyle[])[GradientAnimationStyle.Wave, GradientAnimationStyle.Pulse, GradientAnimationStyle.Static])
+        {
+            if (ImGui.RadioButton($"{style}###{activityConfigId}Anim{style}", animStyle == style))
+            {
+                activityConfig.GradientAnimationStyle = style;
+                Config.Save();
+            }
+            ImGui.SameLine();
+        }
+
+        if (activityConfig.GradientColourSet == -1)
+        {
+            var color3 = activityConfig.Color3;
+            if (ImGuiHelper.DrawColorPicker($"Color 2###{activityConfigId}GradColor2", ref color3, checkboxSize))
+            {
+                activityConfig.Color3 = color3;
+                Config.Save();
+            }
+        }
+        else
+        {
+            ImGui.NewLine();
         }
     }
 

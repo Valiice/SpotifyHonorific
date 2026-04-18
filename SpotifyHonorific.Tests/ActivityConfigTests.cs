@@ -1,5 +1,6 @@
 using FluentAssertions;
 using SpotifyHonorific.Activities;
+using SpotifyHonorific.Gradient;
 using System.Numerics;
 
 namespace SpotifyHonorific.Tests;
@@ -195,5 +196,43 @@ public class ActivityConfigTests
 
         // Assert
         config.Name.Should().Be(name);
+    }
+
+    [Fact]
+    public void ActivityConfig_GradientFields_DefaultToNull()
+    {
+        var config = new ActivityConfig();
+        config.GradientColourSet.Should().BeNull();
+        config.GradientAnimationStyle.Should().BeNull();
+        config.Color3.Should().BeNull();
+    }
+
+    [Fact]
+    public void ActivityConfig_Clone_ShouldPreserveGradientFields()
+    {
+        var original = new ActivityConfig
+        {
+            GradientColourSet = 2,
+            GradientAnimationStyle = GradientAnimationStyle.Wave,
+            Color3 = new Vector3(1f, 0f, 1f)
+        };
+        var clone = original.Clone();
+        clone.GradientColourSet.Should().Be(2);
+        clone.GradientAnimationStyle.Should().Be(GradientAnimationStyle.Wave);
+        clone.Color3.Should().Be(new Vector3(1f, 0f, 1f));
+    }
+
+    [Fact]
+    public void ActivityConfig_TwoColorGradient_ShouldAcceptNegativeOne()
+    {
+        var config = new ActivityConfig
+        {
+            GradientColourSet = -1,
+            Glow = new Vector3(0.8f, 0.35f, 0.82f),
+            Color3 = new Vector3(1f, 0.84f, 0f),
+            GradientAnimationStyle = GradientAnimationStyle.Pulse
+        };
+        config.GradientColourSet.Should().Be(-1);
+        config.GradientAnimationStyle.Should().Be(GradientAnimationStyle.Pulse);
     }
 }

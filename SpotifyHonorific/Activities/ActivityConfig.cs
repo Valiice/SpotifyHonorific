@@ -1,4 +1,5 @@
 using Newtonsoft.Json;
+using SpotifyHonorific.Gradient;
 using System;
 using System.Collections.Generic;
 using System.Numerics;
@@ -45,6 +46,9 @@ public class ActivityConfig
     public bool RainbowMode { get; set; }
     public Vector3? Color { get; set; }
     public Vector3? Glow { get; set; }
+    public int? GradientColourSet { get; set; }
+    public GradientAnimationStyle? GradientAnimationStyle { get; set; }
+    public Vector3? Color3 { get; set; }
 
     public ActivityConfig Clone()
     {
