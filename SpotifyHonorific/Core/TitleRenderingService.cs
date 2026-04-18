@@ -65,7 +65,7 @@ public class TitleRenderingService
     /// <summary>
     /// Creates serialized JSON data for the Honorific IPC call.
     /// </summary>
-    public string SerializeTitleData(string title, ActivityConfig activityConfig, UpdaterContext context)
+    public string SerializeTitleData(string title, ActivityConfig activityConfig, UpdaterContext context, bool isHonorificSupporter)
     {
         var colorToUse = activityConfig.Color;
 
@@ -82,7 +82,8 @@ public class TitleRenderingService
             { "Color", colorToUse },
         };
 
-        if (activityConfig.GradientColourSet != null)
+        var hasGradient = isHonorificSupporter && activityConfig.GradientColourSet != null;
+        if (hasGradient)
         {
             data["GradientColourSet"] = activityConfig.GradientColourSet;
             data["GradientAnimationStyle"] = (int?)activityConfig.GradientAnimationStyle;

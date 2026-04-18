@@ -30,7 +30,7 @@ public class TitleRenderingServiceTests
             IsPrefix = false,
             Glow = new Vector3(1f, 0f, 1f)
         };
-        var json = _service.SerializeTitleData("Test", config, MakeContext());
+        var json = _service.SerializeTitleData("Test", config, MakeContext(), true);
         var obj = JObject.Parse(json);
         obj.ContainsKey("Glow").Should().BeTrue();
         obj.ContainsKey("GradientColourSet").Should().BeFalse();
@@ -46,7 +46,7 @@ public class TitleRenderingServiceTests
             GradientColourSet = 3,
             GradientAnimationStyle = GradientAnimationStyle.Wave,
         };
-        var json = _service.SerializeTitleData("Test", config, MakeContext());
+        var json = _service.SerializeTitleData("Test", config, MakeContext(), true);
         var obj = JObject.Parse(json);
         obj["GradientColourSet"]!.Value<int>().Should().Be(3);
         obj["GradientAnimationStyle"]!.Value<int>().Should().Be((int)GradientAnimationStyle.Wave);
@@ -67,7 +67,7 @@ public class TitleRenderingServiceTests
             Color3 = color2,
             GradientAnimationStyle = GradientAnimationStyle.Pulse,
         };
-        var json = _service.SerializeTitleData("Test", config, MakeContext());
+        var json = _service.SerializeTitleData("Test", config, MakeContext(), true);
         var obj = JObject.Parse(json);
         obj["GradientColourSet"]!.Value<int>().Should().Be(-1);
         obj["GradientAnimationStyle"]!.Value<int>().Should().Be((int)GradientAnimationStyle.Pulse);
@@ -79,7 +79,7 @@ public class TitleRenderingServiceTests
     public void SerializeTitleData_AlwaysIncludesTitleAndIsPrefix()
     {
         var config = new ActivityConfig { IsPrefix = true };
-        var json = _service.SerializeTitleData("My Title", config, MakeContext());
+        var json = _service.SerializeTitleData("My Title", config, MakeContext(), true);
         var obj = JObject.Parse(json);
         obj["Title"]!.Value<string>().Should().Be("My Title");
         obj["IsPrefix"]!.Value<bool>().Should().BeTrue();
