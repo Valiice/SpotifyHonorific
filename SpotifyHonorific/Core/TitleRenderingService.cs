@@ -2,6 +2,7 @@ using Dalamud.Plugin.Services;
 using Newtonsoft.Json;
 using SpotifyAPI.Web;
 using SpotifyHonorific.Activities;
+using SpotifyHonorific.Gradient;
 using SpotifyHonorific.Updaters;
 using System.Collections.Generic;
 using System.Numerics;
@@ -74,13 +75,27 @@ public class TitleRenderingService
             colorToUse = HsvToRgb(hue, 1.0f, 1.0f);
         }
 
-        var data = new Dictionary<string, object?>(4)
+        var data = new Dictionary<string, object?>(6)
         {
             { "Title", title },
             { "IsPrefix", activityConfig.IsPrefix },
             { "Color", colorToUse },
-            { "Glow", activityConfig.Glow }
         };
+
+        if (activityConfig.GradientColourSet != null)
+        {
+            data["GradientColourSet"] = activityConfig.GradientColourSet;
+            data["GradientAnimationStyle"] = (int?)activityConfig.GradientAnimationStyle;
+            if (activityConfig.GradientColourSet == -1)
+            {
+                data["Glow"] = activityConfig.Glow;
+                data["Color3"] = activityConfig.Color3;
+            }
+        }
+        else
+        {
+            data["Glow"] = activityConfig.Glow;
+        }
 
         return JsonConvert.SerializeObject(data, Formatting.None);
     }
