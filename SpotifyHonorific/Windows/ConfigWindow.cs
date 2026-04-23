@@ -37,6 +37,7 @@ public class ConfigWindow : Window
     private string[] _cachedConfigNames = [];
     private int _cachedConfigCount;
     private float _kofiButtonWidth;
+    private bool _confirmDeleteAll;
 
     private static readonly string RecreateText = "Recreate Defaults";
     private static readonly System.Reflection.PropertyInfo[] UpdaterContextProperties = typeof(UpdaterContext).GetProperties();
@@ -61,13 +62,29 @@ public class ConfigWindow : Window
     public override void Draw()
     {
         DrawKofiButton();
-        DrawMainSettings();
-        ImGui.Separator();
-        DrawSpotifySetup();
+        DrawPersistentHeader();
         ImGui.Separator();
         DrawValidationErrors();
         ImGui.Spacing();
-        DrawActivityConfigTabs();
+
+        if (ImGui.BeginTabBar("mainTabBar"))
+        {
+            if (ImGui.BeginTabItem("Config"))
+            {
+                ImGui.Spacing();
+                DrawActiveConfigSelector();
+                ImGui.Spacing();
+                DrawActivityConfigTabs();
+                ImGui.EndTabItem();
+            }
+            if (ImGui.BeginTabItem("Account"))
+            {
+                ImGui.Spacing();
+                DrawAccountTab();
+                ImGui.EndTabItem();
+            }
+            ImGui.EndTabBar();
+        }
     }
 
     private void DrawKofiButton()
@@ -88,6 +105,51 @@ public class ConfigWindow : Window
         ImGui.SetCursorPos(startPos);
     }
 
+    private void DrawPersistentHeader()
+    {
+        var enabled = Config.Enabled;
+        if (ImGui.Checkbox("Enabled##enabled", ref enabled))
+        {
+            Config.Enabled = enabled;
+            Config.Save();
+        }
+        ImGui.SameLine();
+        ImGui.TextDisabled("(?)");
+        if (ImGui.IsItemHovered())
+        {
+            ImGui.SetTooltip("Stops polling Spotify when you are idle and no music is playing.\nPolling resumes at the normal rate when activity or music is detected.");
+        }
+
+    }
+
+    private void DrawAccountTab()
+    {
+        DrawSpotifySetup();
+        ImGui.Spacing();
+        var enableDebugLogging = Config.EnableDebugLogging;
+        if (ImGui.Checkbox("Debug Logging##debugLogging", ref enableDebugLogging))
+        {
+            Config.EnableDebugLogging = enableDebugLogging;
+            Config.Save();
+        }
+        ImGui.SameLine();
+        ImGui.TextDisabled("(?)");
+        if (ImGui.IsItemHovered())
+        {
+            ImGui.SetTooltip("Prints detailed status information to the FFXIV plugin log (open with /xllog).\nThis is very spammy and should be kept off unless you are debugging.");
+        }
+
+        ImGui.Spacing();
+        var isSupporter = Config.IsHonorificSupporter;
+        if (ImGui.Checkbox("Supporter##supporter", ref isSupporter))
+        {
+            Config.IsHonorificSupporter = isSupporter;
+            Config.Save();
+        }
+        if (ImGui.IsItemHovered())
+            ImGui.SetTooltip("Tick this if you support Honorific on Ko-fi.\nUnlocks gradient glow styles (supporter-only feature in Honorific).");
+    }
+
     private void DrawValidationErrors()
     {
         if (Config.Validate(out var errors))
@@ -104,41 +166,6 @@ public class ConfigWindow : Window
         }
         ImGui.Unindent(10);
         ImGui.Separator();
-    }
-
-    private void DrawMainSettings()
-    {
-        var enabled = Config.Enabled;
-        if (ImGui.Checkbox("Enabled##enabled", ref enabled))
-        {
-            Config.Enabled = enabled;
-            Config.Save();
-        }
-
-        ImGui.SameLine();
-        ImGui.TextDisabled("(?)");
-        if (ImGui.IsItemHovered())
-        {
-            ImGui.SetTooltip("Stops polling Spotify when you are idle and no music is playing.\nPolling resumes at the normal rate when activity or music is detected.");
-        }
-
-        ImGui.SameLine();
-        var enableDebugLogging = Config.EnableDebugLogging;
-        if (ImGui.Checkbox("Debug Logging##debugLogging", ref enableDebugLogging))
-        {
-            Config.EnableDebugLogging = enableDebugLogging;
-            Config.Save();
-        }
-        ImGui.SameLine();
-        ImGui.TextDisabled("(?)");
-        if (ImGui.IsItemHovered())
-        {
-            ImGui.SetTooltip("Prints detailed status information to the FFXIV plugin log (open with /xllog).\nThis is very spammy and should be kept off unless you are debugging.");
-        }
-
-
-        ImGui.Spacing();
-        DrawActiveConfigSelector();
     }
 
     private void DrawActiveConfigSelector()
@@ -283,14 +310,32 @@ public class ConfigWindow : Window
         }
 
         ImGui.SameLine();
-        ImGui.PushStyleColor(ImGuiCol.Button, ImGuiColors.DalamudRed);
-        if (ImGui.Button("Delete All##activityConfigsDeleteAll"))
+        if (_confirmDeleteAll)
         {
-            Config.ActivityConfigs.Clear();
-            Config.ActiveConfigName = string.Empty;
-            Config.Save();
+            ImGui.PushStyleColor(ImGuiCol.Button, ImGuiColors.DalamudRed);
+            if (ImGui.Button("Confirm delete all?##activityConfigsDeleteAllConfirm"))
+            {
+                Config.ActivityConfigs.Clear();
+                Config.ActiveConfigName = string.Empty;
+                Config.Save();
+                _confirmDeleteAll = false;
+            }
+            ImGui.PopStyleColor();
+            ImGui.SameLine();
+            if (ImGui.Button("Cancel##activityConfigsDeleteAllCancel"))
+            {
+                _confirmDeleteAll = false;
+            }
         }
-        ImGui.PopStyleColor();
+        else
+        {
+            ImGui.PushStyleColor(ImGuiCol.Button, ImGuiColors.DalamudRed);
+            if (ImGui.Button("Delete All##activityConfigsDeleteAll"))
+            {
+                _confirmDeleteAll = true;
+            }
+            ImGui.PopStyleColor();
+        }
 
         if (ImGui.BeginTabBar("activityConfigsTabBar"))
         {
@@ -576,7 +621,16 @@ public class ConfigWindow : Window
             }
         }
 
-        DrawGradientSettings(activityConfig, activityConfigId, checkboxSize);
+        if (Config.IsHonorificSupporter)
+        {
+            ImGui.Spacing();
+            if (ImGui.CollapsingHeader($"Gradient Glow###{activityConfigId}CollapsingGradient"))
+            {
+                ImGui.Indent(10);
+                DrawGradientSettings(activityConfig, activityConfigId, checkboxSize);
+                ImGui.Unindent(10);
+            }
+        }
     }
 
     private void DrawGradientSettings(ActivityConfig activityConfig, string activityConfigId, Vector2 checkboxSize)
@@ -588,24 +642,6 @@ public class ConfigWindow : Window
             var i => GradientPresets.GetName(i!.Value)
         };
 
-        ImGui.Text("Gradient Glow:");
-        ImGui.SameLine();
-        var isSupporter = Config.IsHonorificSupporter;
-        if (ImGui.Checkbox($"Supporter###{activityConfigId}Supporter", ref isSupporter))
-        {
-            Config.IsHonorificSupporter = isSupporter;
-            Config.Save();
-        }
-        if (ImGui.IsItemHovered())
-            ImGui.SetTooltip("Tick this if you support Honorific on Ko-fi.\nUnlocks gradient glow styles (supporter-only feature in Honorific).");
-
-        if (!Config.IsHonorificSupporter)
-        {
-            ImGui.NewLine();
-            return;
-        }
-
-        ImGui.SameLine();
         ImGui.SetNextItemWidth(160);
         if (ImGui.BeginCombo($"###{activityConfigId}Gradient", currentLabel))
         {
@@ -644,14 +680,15 @@ public class ConfigWindow : Window
 
         ImGui.SameLine();
         var animStyle = activityConfig.GradientAnimationStyle ?? GradientAnimationStyle.Wave;
-        foreach (var style in (GradientAnimationStyle[])[GradientAnimationStyle.Wave, GradientAnimationStyle.Pulse, GradientAnimationStyle.Static])
+        var animStyles = new[] { GradientAnimationStyle.Wave, GradientAnimationStyle.Pulse, GradientAnimationStyle.Static };
+        var animNames = new[] { "Wave", "Pulse", "Static" };
+        var animIndex = Array.IndexOf(animStyles, animStyle);
+        if (animIndex < 0) animIndex = 0;
+        ImGui.SetNextItemWidth(100);
+        if (ImGui.Combo($"###{activityConfigId}AnimStyle", ref animIndex, animNames, animNames.Length))
         {
-            if (ImGui.RadioButton($"{style}###{activityConfigId}Anim{style}", animStyle == style))
-            {
-                activityConfig.GradientAnimationStyle = style;
-                Config.Save();
-            }
-            ImGui.SameLine();
+            activityConfig.GradientAnimationStyle = animStyles[animIndex];
+            Config.Save();
         }
 
         if (activityConfig.GradientColourSet == -1)
