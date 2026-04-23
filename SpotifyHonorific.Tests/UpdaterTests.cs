@@ -120,6 +120,22 @@ public class UpdaterPerformanceTests
 public class TitleUpdateStateTests
 {
     [Fact]
+    public void ForceResend_NullsLastSentJson_WithoutClearingUpdateAction()
+    {
+        // Zone change: Honorific cleared the title, but the update loop must keep running.
+        // ForceResend should null LastSentJson so the next render re-sends to Honorific,
+        // without nulling UpdateAction (which would add a 2s delay waiting for next poll).
+        var state = new TitleUpdateState
+        {
+            UpdateAction = () => { },
+            LastSentJson = "existing json"
+        };
+        state.ForceResend();
+        state.LastSentJson.Should().BeNull();
+        state.UpdateAction.Should().NotBeNull();
+    }
+
+    [Fact]
     public void Clear_NullsUpdateAction()
     {
         var state = new TitleUpdateState { UpdateAction = () => { } };

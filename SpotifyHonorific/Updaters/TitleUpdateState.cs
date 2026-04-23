@@ -18,5 +18,13 @@ internal sealed class TitleUpdateState
         LastSentJson = null;
     }
 
+    // Nulls LastSentJson without touching UpdateAction, so the next render frame
+    // re-sends to Honorific without waiting for the next 2-second poll cycle.
+    // Used when an external event (zone change) clears the title from Honorific's side.
+    public void ForceResend()
+    {
+        LastSentJson = null;
+    }
+
     public bool ShouldSend(string serializedData) => serializedData != LastSentJson;
 }
