@@ -430,11 +430,12 @@ public class ConfigWindow : Window
         ImGui.Spacing();
         ImGui.Indent(10);
 
+        var isMock = playbackState.CurrentTrack == null;
+        var track = isMock ? (object)CreateMockSpotifyTrack() : playbackState.CurrentTrack!;
+        var mockContext = new UpdaterContext { SecsElapsed = 0 };
+
         try
         {
-            var mockTrack = CreateMockSpotifyTrack();
-            var mockContext = new UpdaterContext { SecsElapsed = 0 };
-
             var titleTemplate = Template.Parse(activityConfig.TitleTemplate);
             if (titleTemplate.HasErrors)
             {
@@ -442,7 +443,7 @@ public class ConfigWindow : Window
             }
             else
             {
-                var renderedTitle = titleTemplate.Render(new { Activity = mockTrack, Context = mockContext }, member => member.Name);
+                var renderedTitle = titleTemplate.Render(new { Activity = track, Context = mockContext }, member => member.Name);
 
                 ImGui.Text("Result:");
                 ImGui.SameLine();
@@ -461,10 +462,26 @@ public class ConfigWindow : Window
                 ImGui.SameLine();
                 ImGui.TextColored(lengthColor, $"({length}/32)");
 
+                if (isMock)
+                {
+                    ImGui.SameLine();
+                    ImGui.TextDisabled("(mock)");
+                }
+
                 if (length > 32)
                 {
                     ImGuiHelper.TextWarning("⚠ Title exceeds 32 character limit and will be rejected by Honorific plugin.");
                 }
+            }
+
+            if (!string.IsNullOrWhiteSpace(activityConfig.FilterTemplate))
+            {
+                ImGui.Spacing();
+                var filterResult = EvaluateFilterTemplate(activityConfig.FilterTemplate, track);
+                if (filterResult == true)
+                    ImGui.TextColored(ImGuiColors.HealerGreen, "✓ Filter matches");
+                else
+                    ImGui.TextColored(ImGuiColors.DalamudRed, "✗ Filter skipped");
             }
         }
         catch (Exception ex)
@@ -488,6 +505,26 @@ public class ConfigWindow : Window
             DurationMs = 213000,
             Popularity = 85
         };
+    }
+
+    internal static bool? EvaluateFilterTemplate(string filterTemplate, object track)
+    {
+        if (string.IsNullOrWhiteSpace(filterTemplate))
+            return null;
+
+        try
+        {
+            var template = Template.Parse(filterTemplate);
+            if (template.HasErrors)
+                return false;
+
+            var result = template.Render(new { Activity = track }, member => member.Name).Trim();
+            return bool.TryParse(result, out var b) ? b : (bool?)false;
+        }
+        catch
+        {
+            return false;
+        }
     }
 
     private static void DrawTemplateVariablesTable(string activityConfigId)
