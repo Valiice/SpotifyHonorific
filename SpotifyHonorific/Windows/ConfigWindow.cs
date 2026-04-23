@@ -5,6 +5,7 @@ using Dalamud.Interface.Windowing;
 using Dalamud.Utility;
 using SpotifyHonorific.Activities;
 using SpotifyHonorific.Authentication;
+using SpotifyHonorific.Core;
 using SpotifyHonorific.Gradient;
 using SpotifyHonorific.Updaters;
 using SpotifyHonorific.Utils;
@@ -27,6 +28,7 @@ public class ConfigWindow : Window
     private ImGuiHelper ImGuiHelper { get; init; }
     private Updater Updater { get; init; }
     private SpotifyAuthenticator SpotifyAuthenticator { get; init; }
+    private PlaybackState PlaybackState { get; init; }
 
     private string _spotifyClientIdBuffer = string.Empty;
     private string _spotifyClientSecretBuffer = string.Empty;
@@ -41,7 +43,7 @@ public class ConfigWindow : Window
     private static readonly string RecreateText = "Recreate Defaults";
     private static readonly System.Reflection.PropertyInfo[] UpdaterContextProperties = typeof(UpdaterContext).GetProperties();
 
-    public ConfigWindow(Config config, ImGuiHelper imGuiHelper, Updater updater, SpotifyAuthenticator spotifyAuthenticator) : base("Spotify Activity Honorific Config##configWindow")
+    public ConfigWindow(Config config, ImGuiHelper imGuiHelper, Updater updater, SpotifyAuthenticator spotifyAuthenticator, PlaybackState playbackState) : base("Spotify Activity Honorific Config##configWindow")
     {
         SizeConstraints = new WindowSizeConstraints
         {
@@ -53,6 +55,7 @@ public class ConfigWindow : Window
         ImGuiHelper = imGuiHelper;
         Updater = updater;
         SpotifyAuthenticator = spotifyAuthenticator;
+        PlaybackState = playbackState;
 
         _spotifyClientIdBuffer = Config.SpotifyClientId;
         _spotifyClientSecretBuffer = Config.SpotifyClientSecret;
@@ -414,13 +417,13 @@ public class ConfigWindow : Window
 
         DrawTitleStyleSettings(activityConfig, activityConfigId);
         ImGui.Spacing();
-        DrawTemplatePreview(activityConfig);
+        DrawTemplatePreview(activityConfig, PlaybackState);
 
         ImGui.Unindent();
         ImGui.EndTabItem();
     }
 
-    private static void DrawTemplatePreview(ActivityConfig activityConfig)
+    private static void DrawTemplatePreview(ActivityConfig activityConfig, PlaybackState playbackState)
     {
         ImGui.Separator();
         ImGui.Text("Live Preview:");

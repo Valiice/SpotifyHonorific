@@ -31,6 +31,7 @@ public class Updater : IDisposable
     public bool IsPlayerAfk { get; private set; }
 
     private readonly TitleUpdateState _titleState = new();
+    private readonly PlaybackState _playbackState;
     private readonly UpdaterContext _updaterContext = new();
     private readonly IClientState _clientState;
 
@@ -43,13 +44,14 @@ public class Updater : IDisposable
     private readonly HashSet<string> _tracksPlayedToday = new(100);
     private readonly DateTime _sessionStartTime;
 
-    public Updater(IChatGui chatGui, Config config, IFramework framework, IDalamudPluginInterface pluginInterface, IPluginLog pluginLog, IClientState clientState)
+    public Updater(IChatGui chatGui, Config config, IFramework framework, IDalamudPluginInterface pluginInterface, IPluginLog pluginLog, IClientState clientState, PlaybackState playbackState)
     {
         _chatGui = chatGui;
         _config = config;
         _framework = framework;
         _pluginLog = pluginLog;
         _clientState = clientState;
+        _playbackState = playbackState;
 
         _setCharacterTitleSubscriber = pluginInterface.GetIpcSubscriber<int, string, object>("Honorific.SetCharacterTitle");
         _clearCharacterTitleSubscriber = pluginInterface.GetIpcSubscriber<int, object>("Honorific.ClearCharacterTitle");
@@ -203,6 +205,8 @@ public class Updater : IDisposable
 
     private void ProcessPollResult(FullTrack? track)
     {
+        _playbackState.CurrentTrack = track;
+
         if (track != null)
         {
             _isMusicPlaying = true;
