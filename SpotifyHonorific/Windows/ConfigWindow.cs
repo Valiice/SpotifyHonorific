@@ -37,6 +37,7 @@ public class ConfigWindow : Window
     private string[] _cachedConfigNames = [];
     private int _cachedConfigCount;
     private float _kofiButtonWidth;
+    private bool _confirmDeleteAll;
 
     private static readonly string RecreateText = "Recreate Defaults";
     private static readonly System.Reflection.PropertyInfo[] UpdaterContextProperties = typeof(UpdaterContext).GetProperties();
@@ -310,13 +311,30 @@ public class ConfigWindow : Window
 
         ImGui.SameLine();
         ImGui.PushStyleColor(ImGuiCol.Button, ImGuiColors.DalamudRed);
-        if (ImGui.Button("Delete All##activityConfigsDeleteAll"))
+        if (_confirmDeleteAll)
         {
-            Config.ActivityConfigs.Clear();
-            Config.ActiveConfigName = string.Empty;
-            Config.Save();
+            if (ImGui.Button("Confirm delete all?##activityConfigsDeleteAllConfirm"))
+            {
+                Config.ActivityConfigs.Clear();
+                Config.ActiveConfigName = string.Empty;
+                Config.Save();
+                _confirmDeleteAll = false;
+            }
+            ImGui.PopStyleColor();
+            ImGui.SameLine();
+            if (ImGui.Button("Cancel##activityConfigsDeleteAllCancel"))
+            {
+                _confirmDeleteAll = false;
+            }
         }
-        ImGui.PopStyleColor();
+        else
+        {
+            if (ImGui.Button("Delete All##activityConfigsDeleteAll"))
+            {
+                _confirmDeleteAll = true;
+            }
+            ImGui.PopStyleColor();
+        }
 
         if (ImGui.BeginTabBar("activityConfigsTabBar"))
         {
