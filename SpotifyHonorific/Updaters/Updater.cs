@@ -30,8 +30,7 @@ public class Updater : IDisposable
 
     public bool IsPlayerAfk { get; private set; }
 
-    private Action? _updateTitle;
-    private string? _updatedTitleJson;
+    private readonly TitleUpdateState _titleState = new();
     private readonly UpdaterContext _updaterContext = new();
 
     private double _pollingTimer;
@@ -53,7 +52,6 @@ public class Updater : IDisposable
         _setCharacterTitleSubscriber = pluginInterface.GetIpcSubscriber<int, string, object>("Honorific.SetCharacterTitle");
         _clearCharacterTitleSubscriber = pluginInterface.GetIpcSubscriber<int, object>("Honorific.ClearCharacterTitle");
 
-        // Initialize services
         _templateCache = new TemplateCache(pluginLog);
         _pollingService = new SpotifyPollingService(config, pluginLog, chatGui);
         _renderingService = new TitleRenderingService(_templateCache, pluginLog, chatGui);
@@ -136,18 +134,18 @@ public class Updater : IDisposable
 
     private void ProcessTitleUpdate(double deltaSeconds)
     {
-        if (_updateTitle == null) return;
+        if (_titleState.UpdateAction == null) return;
 
         _updaterContext.SecsElapsed += deltaSeconds;
         try
         {
-            _updateTitle();
+            _titleState.UpdateAction();
         }
         catch (Exception e)
         {
             _pluginLog.Error(e, "Failed to update title");
             _chatGui.PrintError($"SpotifyHonorific: Failed to update title. Check /xllog for details.");
-            _updateTitle = null;
+            _titleState.Clear();
         }
     }
 
@@ -155,7 +153,7 @@ public class Updater : IDisposable
     {
         if (!_config.Enabled)
         {
-            if (_updatedTitleJson != null)
+            if (_titleState.LastSentJson != null)
             {
                 ClearTitle();
             }
@@ -186,19 +184,7 @@ public class Updater : IDisposable
         try
         {
             var track = await _pollingService.GetCurrentlyPlayingTrackAsync().ConfigureAwait(false);
-
-            if (track != null)
-            {
-                _isMusicPlaying = true;
-                _tracksPlayedToday.Add(track.Id);
-                ProcessCurrentlyPlayingTrack(track);
-            }
-            else
-            {
-                _isMusicPlaying = false;
-                _currentTrackId = null;
-                ClearTitle();
-            }
+            await _framework.RunOnFrameworkThread(() => ProcessPollResult(track)).ConfigureAwait(false);
         }
         finally
         {
@@ -206,9 +192,29 @@ public class Updater : IDisposable
         }
     }
 
+    private void ProcessPollResult(FullTrack? track)
+    {
+        if (track != null)
+        {
+            _isMusicPlaying = true;
+            _tracksPlayedToday.Add(track.Id);
+            ProcessCurrentlyPlayingTrack(track);
+        }
+        else
+        {
+            _isMusicPlaying = false;
+            _currentTrackId = null;
+            ClearTitle();
+        }
+    }
+
+    // Exposed for testing — do not call directly outside Updater.
+    internal static bool ShouldSkipTrackProcessing(string? currentTrackId, string newTrackId, Action? updateTitle)
+        => currentTrackId == newTrackId && updateTitle != null;
+
     private void ProcessCurrentlyPlayingTrack(FullTrack track)
     {
-        if (track.Id == _currentTrackId)
+        if (ShouldSkipTrackProcessing(_currentTrackId, track.Id, _titleState.UpdateAction))
         {
             return;
         }
@@ -225,7 +231,7 @@ public class Updater : IDisposable
         }
 
         _updaterContext.SecsElapsed = 0;
-        _updateTitle = CreateTitleUpdateAction(activityConfig, track);
+        _titleState.UpdateAction = CreateTitleUpdateAction(activityConfig, track);
     }
 
     private Action CreateTitleUpdateAction(ActivityConfig activityConfig, FullTrack track)
@@ -248,7 +254,7 @@ public class Updater : IDisposable
         if (title == null) return;
 
         var serializedData = _renderingService.SerializeTitleData(title, activityConfig, _updaterContext, _config.IsHonorificSupporter);
-        if (serializedData == _updatedTitleJson) return;
+        if (!_titleState.ShouldSend(serializedData)) return;
 
         if (_config.EnableDebugLogging)
         {
@@ -256,12 +262,12 @@ public class Updater : IDisposable
         }
 
         _setCharacterTitleSubscriber.InvokeAction(0, serializedData);
-        _updatedTitleJson = serializedData;
+        _titleState.LastSentJson = serializedData;
     }
 
     private void ClearTitle()
     {
-        if (_updatedTitleJson == null) return;
+        if (_titleState.LastSentJson == null) return;
 
         _pluginLog.Debug("Call Honorific ClearCharacterTitle IPC");
         _framework.RunOnFrameworkThread(() =>
@@ -269,8 +275,7 @@ public class Updater : IDisposable
             _clearCharacterTitleSubscriber.InvokeAction(0);
         });
         _updaterContext.SecsElapsed = 0;
-        _updateTitle = null;
-        _updatedTitleJson = null;
+        _titleState.Clear();
         _currentTrackId = null;
     }
 }
