@@ -92,7 +92,7 @@ public class ConfigWindow : Window
     {
         if (Config.Validate(out var errors))
         {
-            return; // No errors, don't display anything
+            return;
         }
 
         ImGuiHelper.TextError("⚠ Configuration Issues:");

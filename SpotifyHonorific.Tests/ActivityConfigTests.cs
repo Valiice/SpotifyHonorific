@@ -5,9 +5,6 @@ using System.Numerics;
 
 namespace SpotifyHonorific.Tests;
 
-/// <summary>
-/// Tests for ActivityConfig class, including cloning and default generation
-/// </summary>
 public class ActivityConfigTests
 {
     [Fact]

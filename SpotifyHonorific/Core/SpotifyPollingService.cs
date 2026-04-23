@@ -11,9 +11,6 @@ using System.Threading.Tasks;
 
 namespace SpotifyHonorific.Core;
 
-/// <summary>
-/// Handles Spotify API communication, token management, and polling.
-/// </summary>
 public class SpotifyPollingService
 {
     private const int API_TIMEOUT_MS = 5000;
@@ -43,10 +40,6 @@ public class SpotifyPollingService
         _chatGui = chatGui;
     }
 
-    /// <summary>
-    /// Polls Spotify for the currently playing track.
-    /// Returns null if not playing or on error.
-    /// </summary>
     public async Task<FullTrack?> GetCurrentlyPlayingTrackAsync()
     {
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
@@ -102,9 +95,6 @@ public class SpotifyPollingService
         }
     }
 
-    /// <summary>
-    /// Resets the client state, forcing re-authentication on next poll.
-    /// </summary>
     public void ResetClient()
     {
         _currentAccessToken = null;

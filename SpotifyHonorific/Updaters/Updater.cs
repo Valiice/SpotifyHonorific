@@ -208,7 +208,6 @@ public class Updater : IDisposable
         }
     }
 
-    // Exposed for testing — do not call directly outside Updater.
     internal static bool ShouldSkipTrackProcessing(string? currentTrackId, string newTrackId, Action? updateTitle)
         => currentTrackId == newTrackId && updateTitle != null;
 

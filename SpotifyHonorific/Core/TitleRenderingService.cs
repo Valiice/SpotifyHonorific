@@ -9,9 +9,6 @@ using System.Numerics;
 
 namespace SpotifyHonorific.Core;
 
-/// <summary>
-/// Handles rendering of title templates and preparation of IPC data.
-/// </summary>
 public class TitleRenderingService
 {
     private const ushort MAX_TITLE_LENGTH = 32;
@@ -30,10 +27,6 @@ public class TitleRenderingService
         _chatGui = chatGui;
     }
 
-    /// <summary>
-    /// Renders a title from an activity config and track.
-    /// Returns null if rendering fails or title exceeds max length.
-    /// </summary>
     public string? RenderTitle(ActivityConfig activityConfig, FullTrack track, UpdaterContext context)
     {
         var template = _templateCache.GetOrCreate(activityConfig.TitleTemplate, out var errorMessage);
@@ -62,9 +55,6 @@ public class TitleRenderingService
         return title;
     }
 
-    /// <summary>
-    /// Creates serialized JSON data for the Honorific IPC call.
-    /// </summary>
     public string SerializeTitleData(string title, ActivityConfig activityConfig, UpdaterContext context, bool isHonorificSupporter)
     {
         var colorToUse = activityConfig.Color;
@@ -101,9 +91,6 @@ public class TitleRenderingService
         return JsonConvert.SerializeObject(data, Formatting.None);
     }
 
-    /// <summary>
-    /// Converts HSV color values to RGB Vector3.
-    /// </summary>
     public static Vector3 HsvToRgb(float h, float s, float v)
     {
         var i = (int)(h * 6);
