@@ -310,9 +310,9 @@ public class ConfigWindow : Window
         }
 
         ImGui.SameLine();
-        ImGui.PushStyleColor(ImGuiCol.Button, ImGuiColors.DalamudRed);
         if (_confirmDeleteAll)
         {
+            ImGui.PushStyleColor(ImGuiCol.Button, ImGuiColors.DalamudRed);
             if (ImGui.Button("Confirm delete all?##activityConfigsDeleteAllConfirm"))
             {
                 Config.ActivityConfigs.Clear();
@@ -329,6 +329,7 @@ public class ConfigWindow : Window
         }
         else
         {
+            ImGui.PushStyleColor(ImGuiCol.Button, ImGuiColors.DalamudRed);
             if (ImGui.Button("Delete All##activityConfigsDeleteAll"))
             {
                 _confirmDeleteAll = true;
@@ -620,12 +621,15 @@ public class ConfigWindow : Window
             }
         }
 
-        ImGui.Spacing();
-        if (ImGui.CollapsingHeader($"Gradient Glow###{activityConfigId}CollapsingGradient"))
+        if (Config.IsHonorificSupporter)
         {
-            ImGui.Indent(10);
-            DrawGradientSettings(activityConfig, activityConfigId, checkboxSize);
-            ImGui.Unindent(10);
+            ImGui.Spacing();
+            if (ImGui.CollapsingHeader($"Gradient Glow###{activityConfigId}CollapsingGradient"))
+            {
+                ImGui.Indent(10);
+                DrawGradientSettings(activityConfig, activityConfigId, checkboxSize);
+                ImGui.Unindent(10);
+            }
         }
     }
 
@@ -638,10 +642,6 @@ public class ConfigWindow : Window
             var i => GradientPresets.GetName(i!.Value)
         };
 
-        if (!Config.IsHonorificSupporter)
-            return;
-
-        ImGui.SameLine();
         ImGui.SetNextItemWidth(160);
         if (ImGui.BeginCombo($"###{activityConfigId}Gradient", currentLabel))
         {
