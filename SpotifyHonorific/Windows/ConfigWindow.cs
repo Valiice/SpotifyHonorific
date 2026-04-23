@@ -602,7 +602,13 @@ public class ConfigWindow : Window
             }
         }
 
-        DrawGradientSettings(activityConfig, activityConfigId, checkboxSize);
+        ImGui.Spacing();
+        if (ImGui.CollapsingHeader($"Gradient Glow###{activityConfigId}CollapsingGradient"))
+        {
+            ImGui.Indent(10);
+            DrawGradientSettings(activityConfig, activityConfigId, checkboxSize);
+            ImGui.Unindent(10);
+        }
     }
 
     private void DrawGradientSettings(ActivityConfig activityConfig, string activityConfigId, Vector2 checkboxSize)
