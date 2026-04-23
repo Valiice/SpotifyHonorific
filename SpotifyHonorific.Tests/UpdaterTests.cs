@@ -117,6 +117,78 @@ public class UpdaterPerformanceTests
     }
 }
 
+public class TitleUpdateStateTests
+{
+    [Fact]
+    public void Clear_NullsUpdateAction()
+    {
+        var state = new TitleUpdateState { UpdateAction = () => { } };
+        state.Clear();
+        state.UpdateAction.Should().BeNull();
+    }
+
+    [Fact]
+    public void Clear_NullsLastSentJson()
+    {
+        // Key bug: exception handler only cleared UpdateAction, leaving LastSentJson stale.
+        // Recovery then hit the dedup guard and never re-sent the IPC call.
+        var state = new TitleUpdateState { LastSentJson = "existing json" };
+        state.Clear();
+        state.LastSentJson.Should().BeNull();
+    }
+
+    [Fact]
+    public void ShouldSend_WhenLastSentJsonIsNull_ReturnsTrue()
+    {
+        // After Clear(), recovery must be able to re-send the IPC call.
+        var state = new TitleUpdateState { LastSentJson = null };
+        state.ShouldSend("any json").Should().BeTrue();
+    }
+
+    [Fact]
+    public void ShouldSend_WhenJsonUnchanged_ReturnsFalse()
+    {
+        var state = new TitleUpdateState { LastSentJson = "same" };
+        state.ShouldSend("same").Should().BeFalse();
+    }
+
+    [Fact]
+    public void ShouldSend_WhenJsonChanges_ReturnsTrue()
+    {
+        var state = new TitleUpdateState { LastSentJson = "old" };
+        state.ShouldSend("new").Should().BeTrue();
+    }
+}
+
+public class UpdaterTrackSkipGuardTests
+{
+    [Fact]
+    public void ShouldSkipTrackProcessing_SameTrackWithActiveUpdate_ShouldSkip()
+    {
+        Updater.ShouldSkipTrackProcessing("track1", "track1", () => { }).Should().BeTrue();
+    }
+
+    [Fact]
+    public void ShouldSkipTrackProcessing_SameTrackWithNullUpdate_ShouldNotSkip()
+    {
+        // Bug: same track on repeat, but _updateTitle was cleared (e.g. IPC exception).
+        // Old guard fires and the title never recovers until a different song plays.
+        Updater.ShouldSkipTrackProcessing("track1", "track1", null).Should().BeFalse();
+    }
+
+    [Fact]
+    public void ShouldSkipTrackProcessing_DifferentTrack_ShouldNotSkip()
+    {
+        Updater.ShouldSkipTrackProcessing("track1", "track2", () => { }).Should().BeFalse();
+    }
+
+    [Fact]
+    public void ShouldSkipTrackProcessing_NoCurrentTrack_ShouldNotSkip()
+    {
+        Updater.ShouldSkipTrackProcessing(null, "track1", null).Should().BeFalse();
+    }
+}
+
 public class UpdaterConfigSelectionTests
 {
     [Fact]

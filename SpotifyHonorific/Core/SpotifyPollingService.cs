@@ -53,10 +53,9 @@ public class SpotifyPollingService
 
         try
         {
-            using var cts = new CancellationTokenSource(API_TIMEOUT_MS);
-
+            using var clientCts = new CancellationTokenSource(API_TIMEOUT_MS);
             var spotify = await RetryAsync(
-                () => GetSpotifyClientAsync(cts.Token),
+                () => GetSpotifyClientAsync(clientCts.Token),
                 maxRetries: MAX_RETRY_ATTEMPTS
             ).ConfigureAwait(false);
 
@@ -66,8 +65,9 @@ public class SpotifyPollingService
                 return null;
             }
 
+            using var pollCts = new CancellationTokenSource(API_TIMEOUT_MS);
             var currentlyPlaying = await RetryAsync(
-                () => spotify.Player.GetCurrentlyPlaying(new PlayerCurrentlyPlayingRequest(), cts.Token),
+                () => spotify.Player.GetCurrentlyPlaying(new PlayerCurrentlyPlayingRequest(), pollCts.Token),
                 maxRetries: MAX_RETRY_ATTEMPTS
             ).ConfigureAwait(false);
 

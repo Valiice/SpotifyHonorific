@@ -119,7 +119,7 @@ public class ConfigWindow : Window
         ImGui.TextDisabled("(?)");
         if (ImGui.IsItemHovered())
         {
-            ImGui.SetTooltip("Stops polling Spotify when your character has the <AFK> status.\nPolling will resume at a slower rate when you return.");
+            ImGui.SetTooltip("Stops polling Spotify when you are idle and no music is playing.\nPolling resumes at the normal rate when activity or music is detected.");
         }
 
         ImGui.SameLine();
