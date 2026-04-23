@@ -32,6 +32,7 @@ public class Updater : IDisposable
 
     private readonly TitleUpdateState _titleState = new();
     private readonly UpdaterContext _updaterContext = new();
+    private readonly IClientState _clientState;
 
     private double _pollingTimer;
     private bool _isPolling;
@@ -42,12 +43,13 @@ public class Updater : IDisposable
     private readonly HashSet<string> _tracksPlayedToday = new(100);
     private readonly DateTime _sessionStartTime;
 
-    public Updater(IChatGui chatGui, Config config, IFramework framework, IDalamudPluginInterface pluginInterface, IPluginLog pluginLog)
+    public Updater(IChatGui chatGui, Config config, IFramework framework, IDalamudPluginInterface pluginInterface, IPluginLog pluginLog, IClientState clientState)
     {
         _chatGui = chatGui;
         _config = config;
         _framework = framework;
         _pluginLog = pluginLog;
+        _clientState = clientState;
 
         _setCharacterTitleSubscriber = pluginInterface.GetIpcSubscriber<int, string, object>("Honorific.SetCharacterTitle");
         _clearCharacterTitleSubscriber = pluginInterface.GetIpcSubscriber<int, object>("Honorific.ClearCharacterTitle");
@@ -57,6 +59,7 @@ public class Updater : IDisposable
         _renderingService = new TitleRenderingService(_templateCache, pluginLog, chatGui);
 
         _framework.Update += OnFrameworkUpdate;
+        _clientState.TerritoryChanged += OnTerritoryChanged;
         _sessionStartTime = DateTime.Now;
     }
 
@@ -89,11 +92,17 @@ public class Updater : IDisposable
     public void Dispose()
     {
         _framework.Update -= OnFrameworkUpdate;
+        _clientState.TerritoryChanged -= OnTerritoryChanged;
         _framework.RunOnFrameworkThread(() =>
         {
             _clearCharacterTitleSubscriber.InvokeAction(0);
         });
         GC.SuppressFinalize(this);
+    }
+
+    private void OnTerritoryChanged(ushort territoryId)
+    {
+        _titleState.ForceResend();
     }
 
     private void OnFrameworkUpdate(IFramework framework)
