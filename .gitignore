@@ -4,3 +4,5 @@ bin/
 *.user
 .claude/
 images/
+docs/
+color-preview.html
