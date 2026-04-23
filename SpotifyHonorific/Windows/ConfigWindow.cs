@@ -137,6 +137,16 @@ public class ConfigWindow : Window
         {
             ImGui.SetTooltip("Prints detailed status information to the FFXIV plugin log (open with /xllog).\nThis is very spammy and should be kept off unless you are debugging.");
         }
+
+        ImGui.Spacing();
+        var isSupporter = Config.IsHonorificSupporter;
+        if (ImGui.Checkbox("Supporter##supporter", ref isSupporter))
+        {
+            Config.IsHonorificSupporter = isSupporter;
+            Config.Save();
+        }
+        if (ImGui.IsItemHovered())
+            ImGui.SetTooltip("Tick this if you support Honorific on Ko-fi.\nUnlocks gradient glow styles (supporter-only feature in Honorific).");
     }
 
     private void DrawValidationErrors()
@@ -604,22 +614,8 @@ public class ConfigWindow : Window
             var i => GradientPresets.GetName(i!.Value)
         };
 
-        ImGui.Text("Gradient Glow:");
-        ImGui.SameLine();
-        var isSupporter = Config.IsHonorificSupporter;
-        if (ImGui.Checkbox($"Supporter###{activityConfigId}Supporter", ref isSupporter))
-        {
-            Config.IsHonorificSupporter = isSupporter;
-            Config.Save();
-        }
-        if (ImGui.IsItemHovered())
-            ImGui.SetTooltip("Tick this if you support Honorific on Ko-fi.\nUnlocks gradient glow styles (supporter-only feature in Honorific).");
-
         if (!Config.IsHonorificSupporter)
-        {
-            ImGui.NewLine();
             return;
-        }
 
         ImGui.SameLine();
         ImGui.SetNextItemWidth(160);
