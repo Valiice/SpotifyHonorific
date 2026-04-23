@@ -71,6 +71,8 @@ public class ConfigWindow : Window
             if (ImGui.BeginTabItem("Config"))
             {
                 ImGui.Spacing();
+                DrawActiveConfigSelector();
+                ImGui.Spacing();
                 DrawActivityConfigTabs();
                 ImGui.EndTabItem();
             }
@@ -117,8 +119,6 @@ public class ConfigWindow : Window
             ImGui.SetTooltip("Stops polling Spotify when you are idle and no music is playing.\nPolling resumes at the normal rate when activity or music is detected.");
         }
 
-        ImGui.Spacing();
-        DrawActiveConfigSelector();
     }
 
     private void DrawAccountTab()
