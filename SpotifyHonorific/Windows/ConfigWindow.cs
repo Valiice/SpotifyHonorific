@@ -61,13 +61,27 @@ public class ConfigWindow : Window
     public override void Draw()
     {
         DrawKofiButton();
-        DrawMainSettings();
-        ImGui.Separator();
-        DrawSpotifySetup();
+        DrawPersistentHeader();
         ImGui.Separator();
         DrawValidationErrors();
         ImGui.Spacing();
-        DrawActivityConfigTabs();
+
+        if (ImGui.BeginTabBar("mainTabBar"))
+        {
+            if (ImGui.BeginTabItem("Config"))
+            {
+                ImGui.Spacing();
+                DrawActivityConfigTabs();
+                ImGui.EndTabItem();
+            }
+            if (ImGui.BeginTabItem("Account"))
+            {
+                ImGui.Spacing();
+                DrawAccountTab();
+                ImGui.EndTabItem();
+            }
+            ImGui.EndTabBar();
+        }
     }
 
     private void DrawKofiButton()
@@ -88,6 +102,43 @@ public class ConfigWindow : Window
         ImGui.SetCursorPos(startPos);
     }
 
+    private void DrawPersistentHeader()
+    {
+        var enabled = Config.Enabled;
+        if (ImGui.Checkbox("Enabled##enabled", ref enabled))
+        {
+            Config.Enabled = enabled;
+            Config.Save();
+        }
+        ImGui.SameLine();
+        ImGui.TextDisabled("(?)");
+        if (ImGui.IsItemHovered())
+        {
+            ImGui.SetTooltip("Stops polling Spotify when you are idle and no music is playing.\nPolling resumes at the normal rate when activity or music is detected.");
+        }
+
+        ImGui.Spacing();
+        DrawActiveConfigSelector();
+    }
+
+    private void DrawAccountTab()
+    {
+        DrawSpotifySetup();
+        ImGui.Spacing();
+        var enableDebugLogging = Config.EnableDebugLogging;
+        if (ImGui.Checkbox("Debug Logging##debugLogging", ref enableDebugLogging))
+        {
+            Config.EnableDebugLogging = enableDebugLogging;
+            Config.Save();
+        }
+        ImGui.SameLine();
+        ImGui.TextDisabled("(?)");
+        if (ImGui.IsItemHovered())
+        {
+            ImGui.SetTooltip("Prints detailed status information to the FFXIV plugin log (open with /xllog).\nThis is very spammy and should be kept off unless you are debugging.");
+        }
+    }
+
     private void DrawValidationErrors()
     {
         if (Config.Validate(out var errors))
@@ -104,41 +155,6 @@ public class ConfigWindow : Window
         }
         ImGui.Unindent(10);
         ImGui.Separator();
-    }
-
-    private void DrawMainSettings()
-    {
-        var enabled = Config.Enabled;
-        if (ImGui.Checkbox("Enabled##enabled", ref enabled))
-        {
-            Config.Enabled = enabled;
-            Config.Save();
-        }
-
-        ImGui.SameLine();
-        ImGui.TextDisabled("(?)");
-        if (ImGui.IsItemHovered())
-        {
-            ImGui.SetTooltip("Stops polling Spotify when you are idle and no music is playing.\nPolling resumes at the normal rate when activity or music is detected.");
-        }
-
-        ImGui.SameLine();
-        var enableDebugLogging = Config.EnableDebugLogging;
-        if (ImGui.Checkbox("Debug Logging##debugLogging", ref enableDebugLogging))
-        {
-            Config.EnableDebugLogging = enableDebugLogging;
-            Config.Save();
-        }
-        ImGui.SameLine();
-        ImGui.TextDisabled("(?)");
-        if (ImGui.IsItemHovered())
-        {
-            ImGui.SetTooltip("Prints detailed status information to the FFXIV plugin log (open with /xllog).\nThis is very spammy and should be kept off unless you are debugging.");
-        }
-
-
-        ImGui.Spacing();
-        DrawActiveConfigSelector();
     }
 
     private void DrawActiveConfigSelector()
