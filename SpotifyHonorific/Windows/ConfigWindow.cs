@@ -662,14 +662,15 @@ public class ConfigWindow : Window
 
         ImGui.SameLine();
         var animStyle = activityConfig.GradientAnimationStyle ?? GradientAnimationStyle.Wave;
-        foreach (var style in (GradientAnimationStyle[])[GradientAnimationStyle.Wave, GradientAnimationStyle.Pulse, GradientAnimationStyle.Static])
+        var animStyles = new[] { GradientAnimationStyle.Wave, GradientAnimationStyle.Pulse, GradientAnimationStyle.Static };
+        var animNames = new[] { "Wave", "Pulse", "Static" };
+        var animIndex = Array.IndexOf(animStyles, animStyle);
+        if (animIndex < 0) animIndex = 0;
+        ImGui.SetNextItemWidth(100);
+        if (ImGui.Combo($"###{activityConfigId}AnimStyle", ref animIndex, animNames, animNames.Length))
         {
-            if (ImGui.RadioButton($"{style}###{activityConfigId}Anim{style}", animStyle == style))
-            {
-                activityConfig.GradientAnimationStyle = style;
-                Config.Save();
-            }
-            ImGui.SameLine();
+            activityConfig.GradientAnimationStyle = animStyles[animIndex];
+            Config.Save();
         }
 
         if (activityConfig.GradientColourSet == -1)
