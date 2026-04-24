@@ -661,7 +661,14 @@ public class ConfigWindow : Window
             }
         }
 
-        if (Config.IsHonorificSupporter)
+        if (!Config.IsHonorificSupporter)
+        {
+            ImGui.SameLine();
+            ImGui.TextDisabled("Gradient Glow (?)");
+            if (ImGui.IsItemHovered())
+                ImGui.SetTooltip("Gradient glow styles are available for Ko-fi supporters.\nEnable the Supporter option in the Account tab to unlock.");
+        }
+        else
         {
             ImGui.Spacing();
             if (ImGui.CollapsingHeader($"Gradient Glow###{activityConfigId}CollapsingGradient"))
