@@ -52,7 +52,13 @@ jobs:
           if [ -n "${{ inputs.version }}" ]; then
             BUILD_ARGS="$BUILD_ARGS -p:AssemblyVersion=${{ inputs.version }}"
           fi
-          dotnet build $BUILD_ARGS
+          if ! dotnet build $BUILD_ARGS; then
+            echo "::notice::Stable Dalamud build failed, retrying with staging..."
+            rm -rf $DALAMUD_HOME
+            wget https://goatcorp.github.io/dalamud-distrib/stg/latest.zip -O $DALAMUD_HOME.zip
+            unzip $DALAMUD_HOME.zip -d $DALAMUD_HOME
+            dotnet build $BUILD_ARGS
+          fi
 
       - name: Upload Build Artifact
         uses: actions/upload-artifact@v7
