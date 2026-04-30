@@ -102,7 +102,7 @@ public class Updater : IDisposable
         GC.SuppressFinalize(this);
     }
 
-    private void OnTerritoryChanged(ushort territoryId)
+    private void OnTerritoryChanged(uint territoryId)
     {
         _titleState.ForceResend();
     }
