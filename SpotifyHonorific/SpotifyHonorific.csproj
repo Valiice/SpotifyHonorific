@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Project Sdk="Dalamud.NET.Sdk/15.0.0">
     <PropertyGroup>
+        <Version>1.11.1</Version>
         <Description>Update honorific title based on spotify activity</Description>
         <PackageProjectUrl>https://github.com/Valiice/SpotifyHonorific</PackageProjectUrl>
         <PackageLicenseExpression>AGPL-3.0-or-later</PackageLicenseExpression>
