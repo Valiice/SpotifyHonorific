@@ -19,26 +19,34 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.version.outputs.version }}
+      assembly_version: ${{ steps.version.outputs.assembly_version }}
       tag_name: ${{ steps.version.outputs.tag_name }}
     steps:
       - name: Determine Version
         id: version
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "version=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
-            echo "tag_name=v${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+            VERSION="${{ github.event.inputs.version }}"
+            TAG="v${{ github.event.inputs.version }}"
           else
             VERSION="${{ github.ref_name }}"
-            echo "version=${VERSION#v}" >> $GITHUB_OUTPUT
-            echo "tag_name=${{ github.ref_name }}" >> $GITHUB_OUTPUT
+            VERSION="${VERSION#v}"
+            TAG="${{ github.ref_name }}"
           fi
+          ASSEMBLY_VERSION="$VERSION"
+          if [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            ASSEMBLY_VERSION="${VERSION}.0"
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "assembly_version=$ASSEMBLY_VERSION" >> $GITHUB_OUTPUT
+          echo "tag_name=$TAG" >> $GITHUB_OUTPUT
 
   build:
     needs: prepare
     uses: ./.github/workflows/setup-and-build.yml
     with:
       configuration: Release
-      version: ${{ needs.prepare.outputs.version }}
+      version: ${{ needs.prepare.outputs.assembly_version }}
     secrets:
       token: ${{ secrets.PAT_TOKEN }}
 
@@ -92,7 +100,7 @@ jobs:
           CHANGELOG=$(cat changelog.txt)
           jq -n \
             --arg plugin "SpotifyHonorific" \
-            --arg version "${{ needs.prepare.outputs.version }}" \
+            --arg version "${{ needs.prepare.outputs.assembly_version }}" \
             --arg tag "${{ needs.prepare.outputs.tag_name }}" \
             --arg repo "${{ github.repository }}" \
             --arg changelog "$CHANGELOG" \
