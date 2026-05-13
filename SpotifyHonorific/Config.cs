@@ -27,6 +27,7 @@ public class Config : IPluginConfiguration
     public DateTime LastSpotifyAuthTime { get; set; } = DateTime.MinValue;
 
     public bool EnableDebugLogging { get; set; }
+    public bool EnableNotifications { get; set; } = true;
     public bool IsHonorificSupporter { get; set; }
 
     public string ActiveConfigName { get; set; } = string.Empty;

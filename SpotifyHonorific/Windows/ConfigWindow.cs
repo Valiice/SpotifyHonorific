@@ -129,6 +129,20 @@ public class ConfigWindow : Window
     {
         DrawSpotifySetup();
         ImGui.Spacing();
+        var enableNotifications = Config.EnableNotifications;
+        if (ImGui.Checkbox("Notifications##notifications", ref enableNotifications))
+        {
+            Config.EnableNotifications = enableNotifications;
+            Config.Save();
+        }
+        ImGui.SameLine();
+        ImGui.TextDisabled("(?)");
+        if (ImGui.IsItemHovered())
+        {
+            ImGui.SetTooltip("Shows a periodic warning notification when the plugin is enabled\nbut Spotify is not authenticated.");
+        }
+
+        ImGui.Spacing();
         var enableDebugLogging = Config.EnableDebugLogging;
         if (ImGui.Checkbox("Debug Logging##debugLogging", ref enableDebugLogging))
         {

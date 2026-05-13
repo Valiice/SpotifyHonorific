@@ -20,6 +20,7 @@ public sealed class Plugin : IDalamudPlugin
     [PluginService] internal static IPluginLog PluginLog { get; private set; } = null!;
     [PluginService] internal static IFramework Framework { get; private set; } = null!;
     [PluginService] internal static IClientState ClientState { get; private set; } = null!;
+    [PluginService] internal static INotificationManager NotificationManager { get; private set; } = null!;
 
     private const string CommandName = "/spotifyhonorific";
     private const string CommandHelpMessage = $"Use {CommandName} config to open the settings window, or {CommandName} stats to view performance statistics.";
@@ -44,7 +45,7 @@ public sealed class Plugin : IDalamudPlugin
         }
 
         PlaybackState = new PlaybackState();
-        Updater = new(ChatGui, Config, Framework, PluginInterface, PluginLog, ClientState, PlaybackState);
+        Updater = new(ChatGui, Config, Framework, PluginInterface, PluginLog, ClientState, PlaybackState, NotificationManager);
         SpotifyAuthenticator = new SpotifyAuthenticator(Config, PluginLog);
         ConfigWindow = new ConfigWindow(Config, new(), Updater, SpotifyAuthenticator, PlaybackState);
 

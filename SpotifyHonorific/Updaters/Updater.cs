@@ -1,3 +1,4 @@
+using Dalamud.Interface.ImGuiNotification;
 using Dalamud.Plugin;
 using Dalamud.Plugin.Ipc;
 using Dalamud.Plugin.Services;
@@ -16,11 +17,13 @@ public class Updater : IDisposable
 {
     private const double POLLING_INTERVAL_SECONDS = 2.0;
     private const uint AFK_THRESHOLD_MS = 30000;
+    private const double AUTH_NOTIFICATION_COOLDOWN_SECONDS = 600.0;
 
     private readonly IChatGui _chatGui;
     private readonly Config _config;
     private readonly IFramework _framework;
     private readonly IPluginLog _pluginLog;
+    private readonly INotificationManager _notificationManager;
     private readonly ICallGateSubscriber<int, string, object> _setCharacterTitleSubscriber;
     private readonly ICallGateSubscriber<int, object> _clearCharacterTitleSubscriber;
 
@@ -40,11 +43,12 @@ public class Updater : IDisposable
     private bool _isMusicPlaying;
     private string? _currentTrackId;
     private bool _hasLoggedAfk;
+    private double _authNotificationTimer;
 
     private readonly HashSet<string> _tracksPlayedToday = new(100);
     private readonly DateTime _sessionStartTime;
 
-    public Updater(IChatGui chatGui, Config config, IFramework framework, IDalamudPluginInterface pluginInterface, IPluginLog pluginLog, IClientState clientState, PlaybackState playbackState)
+    public Updater(IChatGui chatGui, Config config, IFramework framework, IDalamudPluginInterface pluginInterface, IPluginLog pluginLog, IClientState clientState, PlaybackState playbackState, INotificationManager notificationManager)
     {
         _chatGui = chatGui;
         _config = config;
@@ -52,6 +56,7 @@ public class Updater : IDisposable
         _pluginLog = pluginLog;
         _clientState = clientState;
         _playbackState = playbackState;
+        _notificationManager = notificationManager;
 
         _setCharacterTitleSubscriber = pluginInterface.GetIpcSubscriber<int, string, object>("Honorific.SetCharacterTitle");
         _clearCharacterTitleSubscriber = pluginInterface.GetIpcSubscriber<int, object>("Honorific.ClearCharacterTitle");
@@ -168,12 +173,19 @@ public class Updater : IDisposable
             {
                 ClearTitle();
             }
+            _authNotificationTimer = 0;
             return;
         }
 
         _pollingTimer += deltaSeconds;
 
-        if (_pollingTimer < POLLING_INTERVAL_SECONDS || _config.SpotifyRefreshToken.IsNullOrWhitespace() || _isPolling)
+        if (_config.SpotifyRefreshToken.IsNullOrWhitespace())
+        {
+            ShowAuthNotificationIfDue(deltaSeconds);
+            return;
+        }
+
+        if (_pollingTimer < POLLING_INTERVAL_SECONDS || _isPolling)
         {
             return;
         }
@@ -275,6 +287,23 @@ public class Updater : IDisposable
 
         _setCharacterTitleSubscriber.InvokeAction(0, serializedData);
         _titleState.LastSentJson = serializedData;
+    }
+
+    private void ShowAuthNotificationIfDue(double deltaSeconds)
+    {
+        if (!_config.EnableNotifications) return;
+
+        _authNotificationTimer += deltaSeconds;
+        if (_authNotificationTimer < AUTH_NOTIFICATION_COOLDOWN_SECONDS) return;
+
+        _authNotificationTimer = 0;
+        _notificationManager.AddNotification(new Notification
+        {
+            Title = "SpotifyHonorific",
+            Content = "Spotify authentication required. Use /spotifyhonorific config to set up.",
+            Type = NotificationType.Warning,
+            Minimized = false,
+        });
     }
 
     private void ClearTitle()
