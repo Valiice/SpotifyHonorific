@@ -1,7 +1,5 @@
 using FluentAssertions;
 using SpotifyHonorific.Updaters;
-using SpotifyHonorific.Activities;
-using System.Numerics;
 
 namespace SpotifyHonorific.Tests;
 
@@ -202,6 +200,73 @@ public class UpdaterTrackSkipGuardTests
     public void ShouldSkipTrackProcessing_NoCurrentTrack_ShouldNotSkip()
     {
         Updater.ShouldSkipTrackProcessing(null, "track1", null).Should().BeFalse();
+    }
+}
+
+public class AuthNotificationTests
+{
+    private const double Cooldown = 600.0;
+
+    [Fact]
+    public void CheckAuthNotificationDue_BelowCooldown_ShouldNotNotify()
+    {
+        var (shouldNotify, newTimer) = Updater.CheckAuthNotificationDue(0, 100, Cooldown, true);
+        shouldNotify.Should().BeFalse();
+        newTimer.Should().BeApproximately(100, 0.001);
+    }
+
+    [Fact]
+    public void CheckAuthNotificationDue_ExactlyCooldown_ShouldNotify()
+    {
+        var (shouldNotify, newTimer) = Updater.CheckAuthNotificationDue(0, Cooldown, Cooldown, true);
+        shouldNotify.Should().BeTrue();
+        newTimer.Should().Be(0);
+    }
+
+    [Fact]
+    public void CheckAuthNotificationDue_ExceedsCooldown_ShouldNotify()
+    {
+        var (shouldNotify, newTimer) = Updater.CheckAuthNotificationDue(590, 20, Cooldown, true);
+        shouldNotify.Should().BeTrue();
+        newTimer.Should().Be(0);
+    }
+
+    [Fact]
+    public void CheckAuthNotificationDue_AccumulatesAcrossCalls()
+    {
+        var timer = 0.0;
+
+        // First call: 300s elapsed, not enough
+        bool shouldNotify;
+        (shouldNotify, timer) = Updater.CheckAuthNotificationDue(timer, 300, Cooldown, true);
+        shouldNotify.Should().BeFalse();
+        timer.Should().BeApproximately(300, 0.001);
+
+        // Second call: another 300s, now at 600 — should fire
+        (shouldNotify, timer) = Updater.CheckAuthNotificationDue(timer, 300, Cooldown, true);
+        shouldNotify.Should().BeTrue();
+        timer.Should().Be(0);
+
+        // Third call: timer reset, 100s not enough again
+        (shouldNotify, timer) = Updater.CheckAuthNotificationDue(timer, 100, Cooldown, true);
+        shouldNotify.Should().BeFalse();
+        timer.Should().BeApproximately(100, 0.001);
+    }
+
+    [Fact]
+    public void CheckAuthNotificationDue_NotificationsDisabled_ShouldNeverNotify()
+    {
+        var (shouldNotify, newTimer) = Updater.CheckAuthNotificationDue(0, Cooldown + 100, Cooldown, false);
+        shouldNotify.Should().BeFalse();
+        newTimer.Should().Be(0);
+    }
+
+    [Fact]
+    public void CheckAuthNotificationDue_NotificationsDisabled_ShouldPreserveTimer()
+    {
+        var (shouldNotify, newTimer) = Updater.CheckAuthNotificationDue(200, 50, Cooldown, false);
+        shouldNotify.Should().BeFalse();
+        newTimer.Should().BeApproximately(200, 0.001);
     }
 }
 

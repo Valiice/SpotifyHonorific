@@ -185,6 +185,8 @@ public class Updater : IDisposable
             return;
         }
 
+        _authNotificationTimer = 0;
+
         if (_pollingTimer < POLLING_INTERVAL_SECONDS || _isPolling)
         {
             return;
@@ -289,14 +291,27 @@ public class Updater : IDisposable
         _titleState.LastSentJson = serializedData;
     }
 
+    internal static (bool ShouldNotify, double NewTimer) CheckAuthNotificationDue(
+        double currentTimer, double deltaSeconds, double cooldownSeconds, bool notificationsEnabled)
+    {
+        if (!notificationsEnabled)
+            return (false, currentTimer);
+
+        var newTimer = currentTimer + deltaSeconds;
+        if (newTimer < cooldownSeconds)
+            return (false, newTimer);
+
+        return (true, 0);
+    }
+
     private void ShowAuthNotificationIfDue(double deltaSeconds)
     {
-        if (!_config.EnableNotifications) return;
+        var (shouldNotify, newTimer) = CheckAuthNotificationDue(
+            _authNotificationTimer, deltaSeconds, AUTH_NOTIFICATION_COOLDOWN_SECONDS, _config.EnableNotifications);
 
-        _authNotificationTimer += deltaSeconds;
-        if (_authNotificationTimer < AUTH_NOTIFICATION_COOLDOWN_SECONDS) return;
+        _authNotificationTimer = newTimer;
+        if (!shouldNotify) return;
 
-        _authNotificationTimer = 0;
         _notificationManager.AddNotification(new Notification
         {
             Title = "SpotifyHonorific",
