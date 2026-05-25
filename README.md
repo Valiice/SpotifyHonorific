@@ -23,7 +23,7 @@ It supports customizable templates, rainbow gradients, and glow effects.
 
 ## Setup Guide
 
-To connect the plugin to your Spotify account, you need to create a simple "App" in the Spotify Developer Dashboard to get a Client ID and Secret.
+To connect the plugin to your Spotify account, you need to create a simple "App" in the Spotify Developer Dashboard to get a Client ID. The plugin uses the OAuth PKCE flow, so a Client Secret is not needed.
 
 ### 1. Create a Spotify App
 1.  Go to the [Spotify Developer Dashboard](https://developer.spotify.com/dashboard) and log in.
@@ -46,14 +46,14 @@ To connect the plugin to your Spotify account, you need to create a simple "App"
 
 ### 3. Get Your Credentials
 1.  Once the app is created, click the **Settings** button (or "Basic Information").
-2.  Locate the **Client ID** and **Client Secret**. (You may need to click "View client secret").
-3.  Keep this page open, you will need to copy these strings.
+2.  Locate the **Client ID**.
+3.  Keep this page open, you will need to copy this string.
 
-![Client ID and Secret](images/image3.png)
+![Client ID](images/image3.png)
 
 ### 4. Authenticate In-Game
 1.  Open the plugin settings in FFXIV using `/spotifyhonorific config`.
-2.  Paste your **Client ID** and **Client Secret** into the respective fields.
+2.  Paste your **Client ID** into the input field.
 3.  Click the **"Authenticate with Spotify"** button.
 4.  A browser window will open requesting permission. Accept it.
 5.  Once successful, the plugin status will change to **Green/Authenticated**.
@@ -68,7 +68,9 @@ You can customize how your title looks using [Scriban](https://github.com/scriba
 * **Rainbow Mode:** Cycles the color of the title through the RGB spectrum.
 * **Glow:** Adds a glow color behind the title.
 * **Prefix:** If checked, the text appears before your name. If unchecked, it acts as a standard title (after your name).
-* **AFK Detection:** Automatically stops polling Spotify when your character goes AFK to save resources.
+
+### Behavior
+* **AFK pause (in-game only):** When your character's in-game online status is set to **Away from Keyboard** *and* nothing is currently playing on Spotify, the plugin stops polling until either the status clears or music resumes. This is not desktop-idle detection — it only triggers when FFXIV itself marks you as AFK, either via the `/afk` command or via the in-game auto-AFK timer (Character Configuration → General → "Display 'Away from Keyboard' status if idle"). If you've disabled that auto-timer, only a manual `/afk` will engage the pause.
 
 ### Template Variables
 When writing your Title Template, you can use the following variables:
@@ -116,7 +118,7 @@ This cycles between "Listening to Spotify", the Song Name, and the Artist Name e
 
   * **Title not appearing?** Ensure you have the **Honorific** plugin (by Caraxi) installed and enabled.
   * **"Spotify client is null"?** Your authentication token may have expired. Go to the config and click "Authenticate with Spotify" again.
-  * **Not updating while AFK?** By default, the plugin stops polling Spotify when your character is AFK to save resources. You can disable this in the settings.
+  * **Not updating while AFK?** Polling only pauses when your in-game online status is **Away from Keyboard** and Spotify isn't playing anything. See the *Behavior* section above for the conditions that flip that status. Desktop-only idle (e.g. alt-tabbed) does not pause polling.
 
 ## License
 

@@ -29,10 +29,9 @@ public class SpotifyAuthenticator : IDisposable
     /// </summary>
     public async Task<bool> AuthenticateAsync()
     {
-        if (string.IsNullOrWhiteSpace(_config.SpotifyClientId) ||
-            string.IsNullOrWhiteSpace(_config.SpotifyClientSecret))
+        if (string.IsNullOrWhiteSpace(_config.SpotifyClientId))
         {
-            _pluginLog.Error("Spotify authentication failed: Client ID and Secret are required.");
+            _pluginLog.Error("Spotify authentication failed: Client ID is required.");
             return false;
         }
 

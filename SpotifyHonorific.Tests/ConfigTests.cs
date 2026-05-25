@@ -87,7 +87,6 @@ public class ConfigTests
         config.Version.Should().Be(0);
         config.Enabled.Should().BeTrue();
         config.SpotifyClientId.Should().BeEmpty();
-        config.SpotifyClientSecret.Should().BeEmpty();
         config.SpotifyRefreshToken.Should().BeEmpty();
         config.LastSpotifyAuthTime.Should().Be(DateTime.MinValue);
         config.EnableDebugLogging.Should().BeFalse();
