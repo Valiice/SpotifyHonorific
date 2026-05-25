@@ -1,6 +1,7 @@
 using Dalamud.Interface;
 using Dalamud.Interface.Colors;
 using Dalamud.Interface.Components;
+using Dalamud.Interface.Utility.Raii;
 using Dalamud.Interface.Windowing;
 using Dalamud.Utility;
 using SpotifyHonorific.Activities;
@@ -21,7 +22,6 @@ namespace SpotifyHonorific.Windows;
 public class ConfigWindow : Window
 {
     private const int SPOTIFY_CLIENT_ID_MAX_LENGTH = 100;
-    private const int SPOTIFY_CLIENT_SECRET_MAX_LENGTH = 100;
     private const ushort MAX_INPUT_LENGTH = ushort.MaxValue;
 
     private Config Config { get; init; }
@@ -31,7 +31,6 @@ public class ConfigWindow : Window
     private PlaybackState PlaybackState { get; init; }
 
     private string _spotifyClientIdBuffer = string.Empty;
-    private string _spotifyClientSecretBuffer = string.Empty;
 
     private string _lastAuthTimeString = string.Empty;
     private DateTime _cachedAuthTime;
@@ -40,6 +39,7 @@ public class ConfigWindow : Window
     private int _cachedConfigCount;
     private float _kofiButtonWidth;
     private bool _confirmDeleteAll;
+    private bool _authInProgress;
 
     private static readonly string RecreateText = "Recreate Defaults";
     private static readonly System.Reflection.PropertyInfo[] UpdaterContextProperties = typeof(UpdaterContext).GetProperties();
@@ -59,7 +59,6 @@ public class ConfigWindow : Window
         PlaybackState = playbackState;
 
         _spotifyClientIdBuffer = Config.SpotifyClientId;
-        _spotifyClientSecretBuffer = Config.SpotifyClientSecret;
     }
 
     public override void Draw()
@@ -120,7 +119,7 @@ public class ConfigWindow : Window
         ImGui.TextDisabled("(?)");
         if (ImGui.IsItemHovered())
         {
-            ImGui.SetTooltip("Stops polling Spotify when you are idle and no music is playing.\nPolling resumes at the normal rate when activity or music is detected.");
+            ImGui.SetTooltip("Toggles the plugin on or off. When off, no Spotify polling is performed\nand no title updates are sent to Honorific.");
         }
 
     }
@@ -233,34 +232,10 @@ public class ConfigWindow : Window
             Config.Save();
         }
 
-        if (ImGui.InputText("Spotify Client Secret", ref _spotifyClientSecretBuffer, SPOTIFY_CLIENT_SECRET_MAX_LENGTH, ImGuiInputTextFlags.Password))
-        {
-            Config.SpotifyClientSecret = _spotifyClientSecretBuffer;
-            Config.Save();
-        }
-
-        if (ImGui.Button("Authenticate with Spotify"))
-        {
-            if (!Config.SpotifyClientId.IsNullOrWhitespace() && !Config.SpotifyClientSecret.IsNullOrWhitespace())
-            {
-                _ = StartSpotifyAuth();
-            }
-        }
+        DrawAuthenticateButton();
 
         ImGui.SameLine();
-        if (Config.SpotifyRefreshToken.IsNullOrWhitespace())
-        {
-            ImGui.TextColored(ImGuiColors.DalamudRed, "State: Not Authenticated");
-        }
-        else
-        {
-            if (_cachedAuthTime != Config.LastSpotifyAuthTime)
-            {
-                _lastAuthTimeString = $"State: Authenticated (Last refresh: {Config.LastSpotifyAuthTime})";
-                _cachedAuthTime = Config.LastSpotifyAuthTime;
-            }
-            ImGui.TextColored(ImGuiColors.ParsedGreen, _lastAuthTimeString);
-        }
+        DrawAuthenticationState();
 
         if (ImGui.IsItemHovered())
         {
@@ -268,13 +243,38 @@ public class ConfigWindow : Window
                 "Instructions:\n" +
                 "1. Go to the Spotify Developer Dashboard (developer.spotify.com/dashboard).\n" +
                 "2. Create a new App.\n" +
-                "3. Note the Client ID and Client Secret and paste them here.\n" +
+                "3. Note the Client ID and paste it here.\n" +
                 "4. In your Spotify App settings, click 'Edit Settings'.\n" +
                 "5. Add 'http://127.0.0.1:5000/callback' to your Redirect URIs.\n" +
                 "6. Click the 'Add' button, then click the 'Save' button at the bottom.\n" +
                 "7. Click the 'Authenticate with Spotify' button (here) to log in."
             );
         }
+    }
+
+    private void DrawAuthenticateButton()
+    {
+        using var disabled = ImRaii.Disabled(_authInProgress);
+        if (ImGui.Button("Authenticate with Spotify") && !Config.SpotifyClientId.IsNullOrWhitespace())
+        {
+            _ = StartSpotifyAuth();
+        }
+    }
+
+    private void DrawAuthenticationState()
+    {
+        if (Config.SpotifyRefreshToken.IsNullOrWhitespace())
+        {
+            ImGui.TextColored(ImGuiColors.DalamudRed, "State: Not Authenticated");
+            return;
+        }
+
+        if (_cachedAuthTime != Config.LastSpotifyAuthTime)
+        {
+            _lastAuthTimeString = $"State: Authenticated (Last refresh: {Config.LastSpotifyAuthTime})";
+            _cachedAuthTime = Config.LastSpotifyAuthTime;
+        }
+        ImGui.TextColored(ImGuiColors.ParsedGreen, _lastAuthTimeString);
     }
 
     private void DrawActivityConfigTabs()
@@ -329,15 +329,16 @@ public class ConfigWindow : Window
         ImGui.SameLine();
         if (_confirmDeleteAll)
         {
-            ImGui.PushStyleColor(ImGuiCol.Button, ImGuiColors.DalamudRed);
-            if (ImGui.Button("Confirm delete all?##activityConfigsDeleteAllConfirm"))
+            using (ImRaii.PushColor(ImGuiCol.Button, ImGuiColors.DalamudRed))
             {
-                Config.ActivityConfigs.Clear();
-                Config.ActiveConfigName = string.Empty;
-                Config.Save();
-                _confirmDeleteAll = false;
+                if (ImGui.Button("Confirm delete all?##activityConfigsDeleteAllConfirm"))
+                {
+                    Config.ActivityConfigs.Clear();
+                    Config.ActiveConfigName = string.Empty;
+                    Config.Save();
+                    _confirmDeleteAll = false;
+                }
             }
-            ImGui.PopStyleColor();
             ImGui.SameLine();
             if (ImGui.Button("Cancel##activityConfigsDeleteAllCancel"))
             {
@@ -346,12 +347,13 @@ public class ConfigWindow : Window
         }
         else
         {
-            ImGui.PushStyleColor(ImGuiCol.Button, ImGuiColors.DalamudRed);
-            if (ImGui.Button("Delete All##activityConfigsDeleteAll"))
+            using (ImRaii.PushColor(ImGuiCol.Button, ImGuiColors.DalamudRed))
             {
-                _confirmDeleteAll = true;
+                if (ImGui.Button("Delete All##activityConfigsDeleteAll"))
+                {
+                    _confirmDeleteAll = true;
+                }
             }
-            ImGui.PopStyleColor();
         }
 
         if (ImGui.BeginTabBar("activityConfigsTabBar"))
@@ -438,17 +440,18 @@ public class ConfigWindow : Window
         }
 
         ImGui.SameLine();
-        ImGui.PushStyleColor(ImGuiCol.Button, ImGuiColors.DalamudRed);
-        if (ImGui.Button($"Delete###{activityConfigId}Delete"))
+        using (ImRaii.PushColor(ImGuiCol.Button, ImGuiColors.DalamudRed))
         {
-            Config.ActivityConfigs.Remove(activityConfig);
-            if (Config.ActiveConfigName == activityConfig.Name && Config.ActivityConfigs.Count > 0)
+            if (ImGui.Button($"Delete###{activityConfigId}Delete"))
             {
-                Config.ActiveConfigName = Config.ActivityConfigs[0].Name;
+                Config.ActivityConfigs.Remove(activityConfig);
+                if (Config.ActiveConfigName == activityConfig.Name && Config.ActivityConfigs.Count > 0)
+                {
+                    Config.ActiveConfigName = Config.ActivityConfigs[0].Name;
+                }
+                Config.Save();
             }
-            Config.Save();
         }
-        ImGui.PopStyleColor();
 
         DrawTemplateVariablesTable(activityConfigId);
 
@@ -769,11 +772,14 @@ public class ConfigWindow : Window
 
     private async Task StartSpotifyAuth()
     {
-        await SpotifyAuthenticator.AuthenticateAsync().ConfigureAwait(false);
-    }
-
-    public override void OnClose()
-    {
-        SpotifyAuthenticator.Dispose();
+        _authInProgress = true;
+        try
+        {
+            await SpotifyAuthenticator.AuthenticateAsync().ConfigureAwait(false);
+        }
+        finally
+        {
+            _authInProgress = false;
+        }
     }
 }

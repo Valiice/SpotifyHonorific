@@ -16,8 +16,9 @@ namespace SpotifyHonorific.Updaters;
 public class Updater : IDisposable
 {
     private const double POLLING_INTERVAL_SECONDS = 2.0;
-    private const uint AFK_THRESHOLD_MS = 30000;
     private const double AUTH_NOTIFICATION_COOLDOWN_SECONDS = 600.0;
+    private const uint AFK_ONLINE_STATUS_ID = 17;
+    private const double AFK_MUSIC_GRACE_SECONDS = 10.0;
 
     private readonly IChatGui _chatGui;
     private readonly Config _config;
@@ -37,6 +38,7 @@ public class Updater : IDisposable
     private readonly PlaybackState _playbackState;
     private readonly UpdaterContext _updaterContext = new();
     private readonly IClientState _clientState;
+    private readonly IObjectTable _objectTable;
 
     private double _pollingTimer;
     private bool _isPolling;
@@ -44,17 +46,19 @@ public class Updater : IDisposable
     private string? _currentTrackId;
     private bool _hasLoggedAfk;
     private double _authNotificationTimer;
+    private double _musicOffSeconds;
 
     private readonly HashSet<string> _tracksPlayedToday = new(100);
     private readonly DateTime _sessionStartTime;
 
-    public Updater(IChatGui chatGui, Config config, IFramework framework, IDalamudPluginInterface pluginInterface, IPluginLog pluginLog, IClientState clientState, PlaybackState playbackState, INotificationManager notificationManager)
+    public Updater(IChatGui chatGui, Config config, IFramework framework, IDalamudPluginInterface pluginInterface, IPluginLog pluginLog, IClientState clientState, IObjectTable objectTable, PlaybackState playbackState, INotificationManager notificationManager)
     {
         _chatGui = chatGui;
         _config = config;
         _framework = framework;
         _pluginLog = pluginLog;
         _clientState = clientState;
+        _objectTable = objectTable;
         _playbackState = playbackState;
         _notificationManager = notificationManager;
 
@@ -114,38 +118,49 @@ public class Updater : IDisposable
 
     private void OnFrameworkUpdate(IFramework framework)
     {
+        var deltaSeconds = framework.UpdateDelta.TotalSeconds;
+        UpdateMusicOffTimer(deltaSeconds);
+
         if (HandleAfkStatus()) return;
 
-        ProcessTitleUpdate(framework.UpdateDelta.TotalSeconds);
-        HandlePolling(framework.UpdateDelta.TotalSeconds);
+        ProcessTitleUpdate(deltaSeconds);
+        HandlePolling(deltaSeconds);
+    }
+
+    private void UpdateMusicOffTimer(double deltaSeconds)
+    {
+        _musicOffSeconds = _isMusicPlaying ? 0.0 : _musicOffSeconds + deltaSeconds;
     }
 
     private bool HandleAfkStatus()
     {
-        try
-        {
-            IsPlayerAfk = NativeMethods.IdleTimeFinder.GetIdleTime() > AFK_THRESHOLD_MS;
-        }
-        catch (Exception e)
-        {
-            _pluginLog.Warning(e, "Could not get system idle time.");
-            IsPlayerAfk = false;
-        }
+        IsPlayerAfk = IsLocalPlayerAfk();
 
-        if (IsPlayerAfk && !_isMusicPlaying)
+        if (ShouldPauseForAfk())
         {
-            if (!_hasLoggedAfk)
-            {
-                _pluginLog.Debug("Player is AFK and no music is playing, stopping polling.");
-                _hasLoggedAfk = true;
-            }
-            ClearTitle();
-            _pollingTimer = 0.0;
+            EngageAfkPause();
             return true;
         }
 
         _hasLoggedAfk = false;
         return false;
+    }
+
+    private bool IsLocalPlayerAfk()
+        => _objectTable.LocalPlayer?.OnlineStatus.RowId == AFK_ONLINE_STATUS_ID;
+
+    private bool ShouldPauseForAfk()
+        => IsPlayerAfk && !_isMusicPlaying && _musicOffSeconds > AFK_MUSIC_GRACE_SECONDS;
+
+    private void EngageAfkPause()
+    {
+        if (!_hasLoggedAfk)
+        {
+            _pluginLog.Debug("Player is AFK and no music is playing, stopping polling.");
+            _hasLoggedAfk = true;
+        }
+        ClearTitle();
+        _pollingTimer = 0.0;
     }
 
     private void ProcessTitleUpdate(double deltaSeconds)

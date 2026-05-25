@@ -28,11 +28,6 @@ public static class ConfigValidator
             errors.Add("Spotify Client ID is required. Please set up your Spotify app credentials.");
         }
 
-        if (config.Enabled && string.IsNullOrWhiteSpace(config.SpotifyClientSecret))
-        {
-            errors.Add("Spotify Client Secret is required. Please set up your Spotify app credentials.");
-        }
-
         if (config.Enabled && !string.IsNullOrWhiteSpace(config.ActiveConfigName))
         {
             if (!ValidationHelper.ConfigExists(config.ActivityConfigs, config.ActiveConfigName) && config.ActivityConfigs.Count > 0)

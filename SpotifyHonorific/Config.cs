@@ -22,7 +22,6 @@ public class Config : IPluginConfiguration
     public bool Enabled { get; set; } = true;
 
     public string SpotifyClientId { get; set; } = string.Empty;
-    public string SpotifyClientSecret { get; set; } = string.Empty;
     public string SpotifyRefreshToken { get; set; } = string.Empty;
     public DateTime LastSpotifyAuthTime { get; set; } = DateTime.MinValue;
 

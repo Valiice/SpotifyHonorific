@@ -103,10 +103,10 @@ public class SpotifyPollingService
 
     private async Task<SpotifyClient?> GetSpotifyClientAsync(CancellationToken cancellationToken = default)
     {
-        var (refreshToken, clientId, clientSecret, lastAuthTime) = _config.WithLock(() =>
-            (_config.SpotifyRefreshToken, _config.SpotifyClientId, _config.SpotifyClientSecret, _config.LastSpotifyAuthTime));
+        var (refreshToken, clientId, lastAuthTime) = _config.WithLock(() =>
+            (_config.SpotifyRefreshToken, _config.SpotifyClientId, _config.LastSpotifyAuthTime));
 
-        if (refreshToken.IsNullOrWhitespace() || clientId.IsNullOrWhitespace() || clientSecret.IsNullOrWhitespace())
+        if (refreshToken.IsNullOrWhitespace() || clientId.IsNullOrWhitespace())
         {
             return null;
         }

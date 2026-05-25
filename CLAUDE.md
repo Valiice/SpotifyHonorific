@@ -36,13 +36,13 @@ This is a **FFXIV Dalamud plugin** that updates a character's honorific title ba
 - **Scriban templating** for dynamic title generation with variables: `Activity` (Spotify FullTrack), `Context.SecsElapsed`
 - **IPC integration** with Honorific plugin for title display
 - **OAuth PKCE flow** via local HTTP server on `http://127.0.0.1:5000/callback`
-- **AFK detection** using Win32 P/Invoke to pause polling when idle
+- **AFK detection** via `IObjectTable.LocalPlayer.OnlineStatus.RowId == 17` (FFXIV "Away from Keyboard") pauses polling when AFK and no track is playing. In-game status only; does not detect desktop idle.
 
 ### Constraints
 
 - **Max title length**: 32 characters
 - **Token refresh**: Every 55 minutes (before 60-minute expiry)
-- **AFK threshold**: 30 seconds idle pauses polling
+- **AFK gating**: only pauses polling when both AFK and no music is playing
 
 ## Code Style
 
