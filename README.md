@@ -17,7 +17,7 @@ It supports customizable templates, rainbow gradients, and glow effects.
 
 ## Installation
 
-1.  Add my custom plugin repository: [https://github.com/Valiice/DalamudPluginRepo](https://github.com/Valiice/DalamudPluginRepo)
+1.  Add my custom plugin repository: [https://raw.githubusercontent.com/Valiice/DalamudPluginRepo/master/repo.json](https://github.com/Valiice/DalamudPluginRepo)
 2.  Search for **SpotifyHonorific** in the Plugin Installer.
 3.  Install and Enable.
 
