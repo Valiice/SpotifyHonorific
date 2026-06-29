@@ -12,7 +12,7 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="Scriban" Version="7.2.4" />
+        <PackageReference Include="Scriban" Version="7.2.5" />
         <PackageReference Include="SpotifyAPI.Web" Version="7.4.2" />
         <PackageReference Include="SpotifyAPI.Web.Auth" Version="7.4.2" />
     </ItemGroup>
