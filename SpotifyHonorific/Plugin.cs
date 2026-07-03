@@ -22,6 +22,7 @@ public sealed class Plugin : IDalamudPlugin
     [PluginService] internal static IClientState ClientState { get; private set; } = null!;
     [PluginService] internal static IObjectTable ObjectTable { get; private set; } = null!;
     [PluginService] internal static INotificationManager NotificationManager { get; private set; } = null!;
+    [PluginService] internal static IContextMenu ContextMenu { get; private set; } = null!;
 
     private const string CommandName = "/spotifyhonorific";
     private const string CommandHelpMessage = $"Use {CommandName} config to open the settings window, {CommandName} nearby to see nearby players' titles, or {CommandName} stats to view performance statistics.";
@@ -37,6 +38,8 @@ public sealed class Plugin : IDalamudPlugin
     private SpotifyPollingService SpotifyPollingService { get; init; }
     private HonorificTitleReader HonorificTitleReader { get; init; }
     private SpotifyAuthenticator SpotifyAuthenticator { get; init; }
+    private TrackQueueService TrackQueueService { get; init; }
+    private NearbyTrackContextMenu NearbyTrackContextMenu { get; init; }
 
     public Plugin()
     {
@@ -54,6 +57,8 @@ public sealed class Plugin : IDalamudPlugin
         NearbyTitleWatcher = new NearbyTitleWatcher(ObjectTable, HonorificTitleReader);
         SpotifyPollingService = new SpotifyPollingService(Config, PluginLog, ChatGui);
         Updater = new(ChatGui, Config, Framework, PluginInterface, PluginLog, ClientState, ObjectTable, PlaybackState, NotificationManager, NearbyTitleWatcher, SpotifyPollingService);
+        TrackQueueService = new TrackQueueService(SpotifyPollingService, PluginLog, ChatGui);
+        NearbyTrackContextMenu = new NearbyTrackContextMenu(ContextMenu, HonorificTitleReader, TrackQueueService, PluginLog);
         SpotifyAuthenticator = new SpotifyAuthenticator(Config, PluginLog);
         ConfigWindow = new ConfigWindow(Config, new(), Updater, SpotifyAuthenticator, PlaybackState);
         NearbyListeningWindow = new NearbyListeningWindow(NearbyTitleWatcher);
@@ -74,6 +79,7 @@ public sealed class Plugin : IDalamudPlugin
     {
         WindowSystem.RemoveAllWindows();
         CommandManager.RemoveHandler(CommandName);
+        NearbyTrackContextMenu.Dispose();
         SpotifyAuthenticator.Dispose();
         Updater.Dispose();
     }
