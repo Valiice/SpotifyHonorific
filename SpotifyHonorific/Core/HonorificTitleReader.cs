@@ -1,6 +1,8 @@
 using Dalamud.Plugin;
 using Dalamud.Plugin.Ipc;
 using Dalamud.Plugin.Services;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using System;
 
 namespace SpotifyHonorific.Core;
@@ -23,16 +25,49 @@ public sealed class HonorificTitleReader : IHonorificTitleReader
 
     public bool TryGetTitle(int objectIndex, out string title)
     {
+        title = string.Empty;
+
+        string rawJson;
         try
         {
-            title = _getCharacterTitleSubscriber.InvokeFunc(objectIndex);
-            return !string.IsNullOrWhiteSpace(title);
+            rawJson = _getCharacterTitleSubscriber.InvokeFunc(objectIndex);
         }
         catch (Exception e)
         {
             _pluginLog.Debug($"Honorific.GetCharacterTitle IPC unavailable or failed: {e.Message}");
-            title = string.Empty;
             return false;
         }
+
+        if (string.IsNullOrWhiteSpace(rawJson)) return false;
+
+        return TryExtractCustomTitle(rawJson, out title);
+    }
+
+    // Honorific.GetCharacterTitle returns the full title-data JSON (the same
+    // schema used to set a title), not plain text. IsOriginal:true means the
+    // title is one of the character's real, unlocked in-game titles just
+    // re-rendered by Honorific rather than custom text — those aren't song
+    // titles, so they're excluded here.
+    internal static bool TryExtractCustomTitle(string rawJson, out string title)
+    {
+        title = string.Empty;
+
+        JObject data;
+        try
+        {
+            data = JObject.Parse(rawJson);
+        }
+        catch (JsonException)
+        {
+            return false;
+        }
+
+        if (data["IsOriginal"]?.ToObject<bool>() == true) return false;
+
+        var extracted = data["Title"]?.ToString();
+        if (string.IsNullOrWhiteSpace(extracted)) return false;
+
+        title = extracted;
+        return true;
     }
 }

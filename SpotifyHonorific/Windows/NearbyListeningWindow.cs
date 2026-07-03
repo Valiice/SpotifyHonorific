@@ -1,13 +1,18 @@
 using Dalamud.Bindings.ImGui;
 using Dalamud.Interface.Windowing;
 using SpotifyHonorific.Core;
+using System;
+using System.Linq;
 using System.Numerics;
 
 namespace SpotifyHonorific.Windows;
 
 public class NearbyListeningWindow : Window
 {
+    private const ushort SEARCH_MAX_LENGTH = 100;
+
     private readonly NearbyTitleWatcher _nearbyTitleWatcher;
+    private string _searchFilter = string.Empty;
 
     public NearbyListeningWindow(NearbyTitleWatcher nearbyTitleWatcher) : base("Nearby Listening##nearbyListeningWindow")
     {
@@ -22,9 +27,17 @@ public class NearbyListeningWindow : Window
 
     public override void Draw()
     {
-        if (_nearbyTitleWatcher.History.Count == 0)
+        ImGui.InputTextWithHint("##nearbySearch", "Search by song title...", ref _searchFilter, SEARCH_MAX_LENGTH);
+
+        var entries = _nearbyTitleWatcher.History
+            .Where(e => string.IsNullOrEmpty(_searchFilter) || e.RawTitle.Contains(_searchFilter, StringComparison.OrdinalIgnoreCase))
+            .ToList();
+
+        if (entries.Count == 0)
         {
-            ImGui.TextUnformatted("No nearby Honorific titles seen yet.");
+            ImGui.TextUnformatted(_nearbyTitleWatcher.History.Count == 0
+                ? "No nearby Honorific titles seen yet."
+                : "No titles match your search.");
             return;
         }
 
@@ -38,7 +51,7 @@ public class NearbyListeningWindow : Window
         ImGui.TableSetupColumn("Last Seen");
         ImGui.TableHeadersRow();
 
-        foreach (var entry in _nearbyTitleWatcher.History)
+        foreach (var entry in entries)
         {
             ImGui.TableNextRow();
             ImGui.TableNextColumn();
