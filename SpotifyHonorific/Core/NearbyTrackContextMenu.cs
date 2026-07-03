@@ -34,6 +34,8 @@ public sealed class NearbyTrackContextMenu : IDisposable
         if (target.TargetObject is not IPlayerCharacter playerCharacter) return;
 
         var objectIndex = playerCharacter.ObjectIndex;
+        if (!_titleReader.TryGetTitle(objectIndex, out _)) return;
+
         args.AddMenuItem(new MenuItem
         {
             Name = "Queue their track (SpotifyHonorific)",
