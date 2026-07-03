@@ -24,12 +24,13 @@ public sealed class Plugin : IDalamudPlugin
     [PluginService] internal static INotificationManager NotificationManager { get; private set; } = null!;
 
     private const string CommandName = "/spotifyhonorific";
-    private const string CommandHelpMessage = $"Use {CommandName} config to open the settings window, or {CommandName} stats to view performance statistics.";
+    private const string CommandHelpMessage = $"Use {CommandName} config to open the settings window, {CommandName} nearby to see nearby players' titles, or {CommandName} stats to view performance statistics.";
 
     public Config Config { get; init; }
 
     public readonly WindowSystem WindowSystem = new("SpotifyHonorific");
     private ConfigWindow ConfigWindow { get; init; }
+    private NearbyListeningWindow NearbyListeningWindow { get; init; }
     private Updater Updater { get; init; }
     private PlaybackState PlaybackState { get; init; }
     private NearbyTitleWatcher NearbyTitleWatcher { get; init; }
@@ -55,8 +56,10 @@ public sealed class Plugin : IDalamudPlugin
         Updater = new(ChatGui, Config, Framework, PluginInterface, PluginLog, ClientState, ObjectTable, PlaybackState, NotificationManager, NearbyTitleWatcher, SpotifyPollingService);
         SpotifyAuthenticator = new SpotifyAuthenticator(Config, PluginLog);
         ConfigWindow = new ConfigWindow(Config, new(), Updater, SpotifyAuthenticator, PlaybackState);
+        NearbyListeningWindow = new NearbyListeningWindow(NearbyTitleWatcher);
 
         WindowSystem.AddWindow(ConfigWindow);
+        WindowSystem.AddWindow(NearbyListeningWindow);
         CommandManager.AddHandler(CommandName, new CommandInfo(OnCommand)
         {
             HelpMessage = CommandHelpMessage
@@ -82,6 +85,10 @@ public sealed class Plugin : IDalamudPlugin
         if (trimmedArgs.Equals("config", StringComparison.OrdinalIgnoreCase))
         {
             ToggleConfigUI();
+        }
+        else if (trimmedArgs.Equals("nearby", StringComparison.OrdinalIgnoreCase))
+        {
+            NearbyListeningWindow.Toggle();
         }
         else if (trimmedArgs.Equals("stats", StringComparison.OrdinalIgnoreCase))
         {
