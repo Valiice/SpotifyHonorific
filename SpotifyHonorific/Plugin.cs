@@ -32,6 +32,9 @@ public sealed class Plugin : IDalamudPlugin
     private ConfigWindow ConfigWindow { get; init; }
     private Updater Updater { get; init; }
     private PlaybackState PlaybackState { get; init; }
+    private NearbyTitleWatcher NearbyTitleWatcher { get; init; }
+    private SpotifyPollingService SpotifyPollingService { get; init; }
+    private HonorificTitleReader HonorificTitleReader { get; init; }
     private SpotifyAuthenticator SpotifyAuthenticator { get; init; }
 
     public Plugin()
@@ -46,7 +49,10 @@ public sealed class Plugin : IDalamudPlugin
         }
 
         PlaybackState = new PlaybackState();
-        Updater = new(ChatGui, Config, Framework, PluginInterface, PluginLog, ClientState, ObjectTable, PlaybackState, NotificationManager);
+        HonorificTitleReader = new HonorificTitleReader(PluginInterface, PluginLog);
+        NearbyTitleWatcher = new NearbyTitleWatcher(ObjectTable, HonorificTitleReader);
+        SpotifyPollingService = new SpotifyPollingService(Config, PluginLog, ChatGui);
+        Updater = new(ChatGui, Config, Framework, PluginInterface, PluginLog, ClientState, ObjectTable, PlaybackState, NotificationManager, NearbyTitleWatcher, SpotifyPollingService);
         SpotifyAuthenticator = new SpotifyAuthenticator(Config, PluginLog);
         ConfigWindow = new ConfigWindow(Config, new(), Updater, SpotifyAuthenticator, PlaybackState);
 

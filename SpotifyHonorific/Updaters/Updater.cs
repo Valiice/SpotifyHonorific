@@ -39,6 +39,7 @@ public class Updater : IDisposable
     private readonly UpdaterContext _updaterContext = new();
     private readonly IClientState _clientState;
     private readonly IObjectTable _objectTable;
+    private readonly NearbyTitleWatcher _nearbyTitleWatcher;
 
     private double _pollingTimer;
     private bool _isPolling;
@@ -51,7 +52,7 @@ public class Updater : IDisposable
     private readonly HashSet<string> _tracksPlayedToday = new(100);
     private readonly DateTime _sessionStartTime;
 
-    public Updater(IChatGui chatGui, Config config, IFramework framework, IDalamudPluginInterface pluginInterface, IPluginLog pluginLog, IClientState clientState, IObjectTable objectTable, PlaybackState playbackState, INotificationManager notificationManager)
+    public Updater(IChatGui chatGui, Config config, IFramework framework, IDalamudPluginInterface pluginInterface, IPluginLog pluginLog, IClientState clientState, IObjectTable objectTable, PlaybackState playbackState, INotificationManager notificationManager, NearbyTitleWatcher nearbyTitleWatcher, SpotifyPollingService spotifyPollingService)
     {
         _chatGui = chatGui;
         _config = config;
@@ -61,12 +62,13 @@ public class Updater : IDisposable
         _objectTable = objectTable;
         _playbackState = playbackState;
         _notificationManager = notificationManager;
+        _nearbyTitleWatcher = nearbyTitleWatcher;
 
         _setCharacterTitleSubscriber = pluginInterface.GetIpcSubscriber<int, string, object>("Honorific.SetCharacterTitle");
         _clearCharacterTitleSubscriber = pluginInterface.GetIpcSubscriber<int, object>("Honorific.ClearCharacterTitle");
 
         _templateCache = new TemplateCache(pluginLog);
-        _pollingService = new SpotifyPollingService(config, pluginLog, chatGui);
+        _pollingService = spotifyPollingService;
         _renderingService = new TitleRenderingService(_templateCache, pluginLog, chatGui);
 
         _framework.Update += OnFrameworkUpdate;
@@ -120,6 +122,7 @@ public class Updater : IDisposable
     {
         var deltaSeconds = framework.UpdateDelta.TotalSeconds;
         UpdateMusicOffTimer(deltaSeconds);
+        _nearbyTitleWatcher.Update(deltaSeconds);
 
         if (HandleAfkStatus()) return;
 
