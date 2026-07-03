@@ -101,6 +101,16 @@ public class SpotifyPollingService
         _spotify = null;
     }
 
+    public async Task<SpotifyClient?> GetAuthenticatedClientAsync(CancellationToken cancellationToken = default)
+    {
+        using var clientCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        clientCts.CancelAfter(API_TIMEOUT_MS);
+        return await RetryAsync(
+            () => GetSpotifyClientAsync(clientCts.Token),
+            maxRetries: MAX_RETRY_ATTEMPTS
+        ).ConfigureAwait(false);
+    }
+
     private async Task<SpotifyClient?> GetSpotifyClientAsync(CancellationToken cancellationToken = default)
     {
         var (refreshToken, clientId, lastAuthTime) = _config.WithLock(() =>

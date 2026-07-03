@@ -47,7 +47,7 @@ public class SpotifyAuthenticator : IDisposable
             {
                 CodeChallenge = challenge,
                 CodeChallengeMethod = "S256",
-                Scope = [Scopes.UserReadCurrentlyPlaying, Scopes.UserReadPlaybackState]
+                Scope = [Scopes.UserReadCurrentlyPlaying, Scopes.UserReadPlaybackState, Scopes.UserModifyPlaybackState]
             };
 
             BrowserUtil.Open(loginRequest.ToUri());
