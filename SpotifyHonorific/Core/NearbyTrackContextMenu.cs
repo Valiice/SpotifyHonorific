@@ -1,6 +1,7 @@
 using Dalamud.Game.ClientState.Objects.SubKinds;
 using Dalamud.Game.Gui.ContextMenu;
 using Dalamud.Plugin.Services;
+using SpotifyHonorific.Utils;
 using System;
 
 namespace SpotifyHonorific.Core;
@@ -9,15 +10,19 @@ public sealed class NearbyTrackContextMenu : IDisposable
 {
     private readonly IContextMenu _contextMenu;
     private readonly IHonorificTitleReader _titleReader;
+    private readonly RecentTitleCache _recentTitleCache;
     private readonly TrackQueueService _trackQueueService;
     private readonly IPluginLog _pluginLog;
+    private readonly IChatGui _chatGui;
 
-    public NearbyTrackContextMenu(IContextMenu contextMenu, IHonorificTitleReader titleReader, TrackQueueService trackQueueService, IPluginLog pluginLog)
+    public NearbyTrackContextMenu(IContextMenu contextMenu, IHonorificTitleReader titleReader, RecentTitleCache recentTitleCache, TrackQueueService trackQueueService, IPluginLog pluginLog, IChatGui chatGui)
     {
         _contextMenu = contextMenu;
         _titleReader = titleReader;
+        _recentTitleCache = recentTitleCache;
         _trackQueueService = trackQueueService;
         _pluginLog = pluginLog;
+        _chatGui = chatGui;
 
         _contextMenu.OnMenuOpened += OnMenuOpened;
     }
@@ -36,21 +41,38 @@ public sealed class NearbyTrackContextMenu : IDisposable
         var objectIndex = playerCharacter.ObjectIndex;
         if (!_titleReader.TryGetTitle(objectIndex, out _)) return;
 
+        var characterName = playerCharacter.Name.TextValue;
         args.AddMenuItem(new MenuItem
         {
             Name = "Queue their track (SpotifyHonorific)",
-            OnClicked = _ => HandleQueueClicked(objectIndex)
+            OnClicked = _ => HandleQueueClicked(objectIndex, characterName)
         });
     }
 
-    private void HandleQueueClicked(int objectIndex)
+    private void HandleQueueClicked(int objectIndex, string characterName)
     {
-        if (!_titleReader.TryGetTitle(objectIndex, out var title))
+        // Prefer the cache of recent non-placeholder samples over a single
+        // fresh read — the title may be mid-cycle showing "Listening to
+        // Spotify" or just one of track/artist at the exact click moment,
+        // while the cache can combine both phases into a better query.
+        var query = _recentTitleCache.BuildSearchQuery(characterName, DateTime.Now);
+        if (query != null)
         {
-            _pluginLog.Debug("No Honorific title available for context menu target.");
+            _ = _trackQueueService.QueueTrackFromTitleAsync(query);
             return;
         }
 
-        _ = _trackQueueService.QueueTrackFromTitleAsync(title);
+        if (_titleReader.TryGetTitle(objectIndex, out var title))
+        {
+            var cleaned = TitleTextCleaner.Clean(title);
+            if (!SpotifyPlaceholderDetector.IsPlaceholder(cleaned) && !string.IsNullOrWhiteSpace(cleaned))
+            {
+                _ = _trackQueueService.QueueTrackFromTitleAsync(title);
+                return;
+            }
+        }
+
+        _pluginLog.Debug("No usable song title seen yet for context menu target.");
+        _chatGui.Print("SpotifyHonorific: Haven't seen their song info yet — wait a few seconds and try again.");
     }
 }

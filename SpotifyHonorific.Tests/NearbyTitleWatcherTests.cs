@@ -23,7 +23,7 @@ public class NearbyTitleWatcherTests
     {
         var objectTable = Substitute.For<IObjectTable>();
         var titleReader = Substitute.For<IHonorificTitleReader>();
-        var watcher = new NearbyTitleWatcher(objectTable, titleReader);
+        var watcher = new NearbyTitleWatcher(objectTable, titleReader, new RecentTitleCache());
 
         watcher.Update(1.0);
 
@@ -43,7 +43,7 @@ public class NearbyTitleWatcherTests
         titleReader.TryGetTitle(1, out Arg.Any<string>())
             .Returns(x => { x[1] = "♪ Track - Artist ♪"; return true; });
 
-        var watcher = new NearbyTitleWatcher(objectTable, titleReader);
+        var watcher = new NearbyTitleWatcher(objectTable, titleReader, new RecentTitleCache());
         watcher.Update(3.0);
 
         watcher.History.Should().ContainSingle();
@@ -63,7 +63,7 @@ public class NearbyTitleWatcherTests
         var titleReader = Substitute.For<IHonorificTitleReader>();
         titleReader.TryGetTitle(1, out Arg.Any<string>()).Returns(false);
 
-        var watcher = new NearbyTitleWatcher(objectTable, titleReader);
+        var watcher = new NearbyTitleWatcher(objectTable, titleReader, new RecentTitleCache());
         watcher.Update(3.0);
 
         watcher.History.Should().BeEmpty();
@@ -80,10 +80,50 @@ public class NearbyTitleWatcherTests
 
         var titleReader = Substitute.For<IHonorificTitleReader>();
 
-        var watcher = new NearbyTitleWatcher(objectTable, titleReader);
+        var watcher = new NearbyTitleWatcher(objectTable, titleReader, new RecentTitleCache());
         watcher.Update(3.0);
 
         watcher.History.Should().BeEmpty();
         titleReader.DidNotReceive().TryGetTitle(Arg.Any<int>(), out Arg.Any<string>());
+    }
+
+    [Fact]
+    public void Update_RealTitle_FeedsRecentTitleCacheWithCleanedText()
+    {
+        var objectTable = Substitute.For<IObjectTable>();
+        objectTable.Length.Returns(2);
+        objectTable[0].Returns((IGameObject?)null);
+        var nearbyPlayer = MakePlayer("Xm'zora Tia");
+        objectTable[1].Returns(nearbyPlayer);
+
+        var titleReader = Substitute.For<IHonorificTitleReader>();
+        titleReader.TryGetTitle(1, out Arg.Any<string>())
+            .Returns(x => { x[1] = "♪ DECADANCE ♪"; return true; });
+
+        var recentTitleCache = new RecentTitleCache();
+        var watcher = new NearbyTitleWatcher(objectTable, titleReader, recentTitleCache);
+        watcher.Update(3.0);
+
+        recentTitleCache.BuildSearchQuery("Xm'zora Tia", DateTime.Now).Should().Be("DECADANCE");
+    }
+
+    [Fact]
+    public void Update_PlaceholderTitle_DoesNotFeedRecentTitleCache()
+    {
+        var objectTable = Substitute.For<IObjectTable>();
+        objectTable.Length.Returns(2);
+        objectTable[0].Returns((IGameObject?)null);
+        var nearbyPlayer = MakePlayer("Xm'zora Tia");
+        objectTable[1].Returns(nearbyPlayer);
+
+        var titleReader = Substitute.For<IHonorificTitleReader>();
+        titleReader.TryGetTitle(1, out Arg.Any<string>())
+            .Returns(x => { x[1] = "♪Listening to Spotify♪"; return true; });
+
+        var recentTitleCache = new RecentTitleCache();
+        var watcher = new NearbyTitleWatcher(objectTable, titleReader, recentTitleCache);
+        watcher.Update(3.0);
+
+        recentTitleCache.BuildSearchQuery("Xm'zora Tia", DateTime.Now).Should().BeNull();
     }
 }

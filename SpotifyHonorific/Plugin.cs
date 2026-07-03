@@ -35,6 +35,7 @@ public sealed class Plugin : IDalamudPlugin
     private Updater Updater { get; init; }
     private PlaybackState PlaybackState { get; init; }
     private NearbyTitleWatcher NearbyTitleWatcher { get; init; }
+    private RecentTitleCache RecentTitleCache { get; init; }
     private SpotifyPollingService SpotifyPollingService { get; init; }
     private HonorificTitleReader HonorificTitleReader { get; init; }
     private SpotifyAuthenticator SpotifyAuthenticator { get; init; }
@@ -54,11 +55,12 @@ public sealed class Plugin : IDalamudPlugin
 
         PlaybackState = new PlaybackState();
         HonorificTitleReader = new HonorificTitleReader(PluginInterface, PluginLog);
-        NearbyTitleWatcher = new NearbyTitleWatcher(ObjectTable, HonorificTitleReader);
+        RecentTitleCache = new RecentTitleCache();
+        NearbyTitleWatcher = new NearbyTitleWatcher(ObjectTable, HonorificTitleReader, RecentTitleCache);
         SpotifyPollingService = new SpotifyPollingService(Config, PluginLog, ChatGui);
         Updater = new(ChatGui, Config, Framework, PluginInterface, PluginLog, ClientState, ObjectTable, PlaybackState, NotificationManager, NearbyTitleWatcher, SpotifyPollingService);
         TrackQueueService = new TrackQueueService(SpotifyPollingService, PluginLog, ChatGui);
-        NearbyTrackContextMenu = new NearbyTrackContextMenu(ContextMenu, HonorificTitleReader, TrackQueueService, PluginLog);
+        NearbyTrackContextMenu = new NearbyTrackContextMenu(ContextMenu, HonorificTitleReader, RecentTitleCache, TrackQueueService, PluginLog, ChatGui);
         SpotifyAuthenticator = new SpotifyAuthenticator(Config, PluginLog);
         ConfigWindow = new ConfigWindow(Config, new(), Updater, SpotifyAuthenticator, PlaybackState);
         NearbyListeningWindow = new NearbyListeningWindow(NearbyTitleWatcher);
