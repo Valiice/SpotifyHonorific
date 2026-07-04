@@ -122,7 +122,14 @@ public class Updater : IDisposable
     {
         var deltaSeconds = framework.UpdateDelta.TotalSeconds;
         UpdateMusicOffTimer(deltaSeconds);
-        _nearbyTitleWatcher.Update(deltaSeconds);
+
+        // Nearby scanning respects the plugin's on/off toggle like everything
+        // else — a disabled plugin shouldn't keep firing IPC reads for every
+        // nearby player.
+        if (_config.Enabled)
+        {
+            _nearbyTitleWatcher.Update(deltaSeconds);
+        }
 
         if (HandleAfkStatus()) return;
 

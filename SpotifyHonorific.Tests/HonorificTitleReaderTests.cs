@@ -125,4 +125,24 @@ public class HonorificTitleReaderTests
         result.Should().BeFalse();
         title.Should().BeEmpty();
     }
+
+    [Fact]
+    public void TryGetTitle_AfterIpcFailure_BacksOffWithoutInvokingIpcAgain()
+    {
+        // A missing Honorific plugin would otherwise throw once per nearby
+        // player per 3s tick forever; after one failure the reader must stop
+        // hitting the IPC gate for the backoff window.
+        var pluginInterface = Substitute.For<IDalamudPluginInterface>();
+        var subscriber = Substitute.For<ICallGateSubscriber<int, string>>();
+        subscriber.InvokeFunc(Arg.Any<int>()).Returns(_ => throw new InvalidOperationException("Honorific not installed"));
+        pluginInterface.GetIpcSubscriber<int, string>("Honorific.GetCharacterTitle").Returns(subscriber);
+        var pluginLog = Substitute.For<IPluginLog>();
+
+        var reader = new HonorificTitleReader(pluginInterface, pluginLog);
+        reader.TryGetTitle(5, out _).Should().BeFalse();
+        reader.TryGetTitle(6, out _).Should().BeFalse();
+        reader.TryGetTitle(7, out _).Should().BeFalse();
+
+        subscriber.Received(1).InvokeFunc(Arg.Any<int>());
+    }
 }

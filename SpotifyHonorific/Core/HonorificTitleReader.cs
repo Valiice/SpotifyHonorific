@@ -14,8 +14,15 @@ public interface IHonorificTitleReader
 
 public sealed class HonorificTitleReader : IHonorificTitleReader
 {
+    // Without a backoff, a missing Honorific plugin means every nearby player
+    // triggers a thrown-and-caught IPC exception plus a log line every watcher
+    // tick, forever — thousands per hour in a crowded zone for an operation
+    // that can't succeed until the user installs Honorific and reloads.
+    private const int IPC_FAILURE_BACKOFF_SECONDS = 60;
+
     private readonly ICallGateSubscriber<int, string> _getCharacterTitleSubscriber;
     private readonly IPluginLog _pluginLog;
+    private DateTime _ipcRetryAt = DateTime.MinValue;
 
     public HonorificTitleReader(IDalamudPluginInterface pluginInterface, IPluginLog pluginLog)
     {
@@ -27,6 +34,8 @@ public sealed class HonorificTitleReader : IHonorificTitleReader
     {
         title = string.Empty;
 
+        if (DateTime.Now < _ipcRetryAt) return false;
+
         string rawJson;
         try
         {
@@ -34,7 +43,8 @@ public sealed class HonorificTitleReader : IHonorificTitleReader
         }
         catch (Exception e)
         {
-            _pluginLog.Debug($"Honorific.GetCharacterTitle IPC unavailable or failed: {e.Message}");
+            _ipcRetryAt = DateTime.Now.AddSeconds(IPC_FAILURE_BACKOFF_SECONDS);
+            _pluginLog.Debug($"Honorific.GetCharacterTitle IPC unavailable or failed, backing off for {IPC_FAILURE_BACKOFF_SECONDS}s: {e.Message}");
             return false;
         }
 
