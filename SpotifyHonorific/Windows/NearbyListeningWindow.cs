@@ -85,6 +85,13 @@ public class NearbyListeningWindow : Window
             {
                 QueueForCharacter(entry.CharacterName);
             }
+            if (ImGui.IsItemHovered())
+            {
+                var query = _recentTitleCache.BuildSearchQuery(entry.CharacterName, DateTime.Now);
+                ImGui.SetTooltip(query != null
+                    ? $"Spotify will search for: {query}"
+                    : "Nothing usable seen yet — wait a few seconds for their title to cycle.");
+            }
         }
 
         ImGui.EndTable();
