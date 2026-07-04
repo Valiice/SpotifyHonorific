@@ -63,6 +63,25 @@ public class RecentTitleCacheTests
     }
 
     [Fact]
+    public void Record_ExistingSampleRefreshedBeforeEviction_EvictsOldestBySeenAtNotListPosition()
+    {
+        // Re-seeing a sample refreshes its SeenAt in place without moving it
+        // in the list, so evicting the positional head would remove the
+        // refreshed (newer) sample and keep a stale one — which then gets
+        // combined into a corrupted cross-song query.
+        var cache = new RecentTitleCache();
+
+        cache.Record("Xm'zora Tia", "TrackA", BaseTime);
+        cache.Record("Xm'zora Tia", "ArtistB", BaseTime.AddSeconds(5));
+        cache.Record("Xm'zora Tia", "TrackA", BaseTime.AddSeconds(10));
+        cache.Record("Xm'zora Tia", "TrackC", BaseTime.AddSeconds(15));
+
+        cache.GetFreshSamples("Xm'zora Tia", BaseTime.AddSeconds(15))
+            .Should().Equal("TrackA", "TrackC");
+        cache.BuildSearchQuery("Xm'zora Tia", BaseTime.AddSeconds(15)).Should().Be("TrackA TrackC");
+    }
+
+    [Fact]
     public void BuildSearchQuery_NoSamplesRecorded_ReturnsNull()
     {
         var cache = new RecentTitleCache();

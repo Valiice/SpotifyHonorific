@@ -58,6 +58,11 @@ public class TrackQueueService
             var artistNames = string.Join(", ", track.Artists.Select(a => a.Name));
             _chatGui.Print($"SpotifyHonorific: Queued \"{track.Name}\" by {artistNames}.");
         }
+        catch (APIUnauthorizedException e)
+        {
+            _pluginLog.Warning(e, "Spotify rejected queue request as unauthorized (token missing the queue scope or expired).");
+            _chatGui.PrintError("SpotifyHonorific: Spotify authorization is missing the queue permission. Re-click 'Authenticate with Spotify' in /spotifyhonorific config, then try again.");
+        }
         catch (APIException e) when (e.Response?.StatusCode == HttpStatusCode.Forbidden)
         {
             _pluginLog.Warning(e, "Spotify rejected queue request due to insufficient scope.");

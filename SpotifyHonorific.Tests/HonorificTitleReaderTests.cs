@@ -60,6 +60,25 @@ public class HonorificTitleReaderTests
     }
 
     [Fact]
+    public void TryGetTitle_IsOriginalIsJsonNull_TreatedAsCustomTitleWithoutThrowing()
+    {
+        // The payload comes from another plugin over IPC — a literal JSON
+        // null for IsOriginal is a non-null JValue that ?. does not
+        // short-circuit on, and must not crash the framework-thread tick.
+        var pluginInterface = Substitute.For<IDalamudPluginInterface>();
+        var subscriber = Substitute.For<ICallGateSubscriber<int, string>>();
+        subscriber.InvokeFunc(5).Returns("""{"Title":"♪ Track - Artist ♪","IsPrefix":false,"IsOriginal":null,"Color":null}""");
+        pluginInterface.GetIpcSubscriber<int, string>("Honorific.GetCharacterTitle").Returns(subscriber);
+        var pluginLog = Substitute.For<IPluginLog>();
+
+        var reader = new HonorificTitleReader(pluginInterface, pluginLog);
+        var result = reader.TryGetTitle(5, out var title);
+
+        result.Should().BeTrue();
+        title.Should().Be("♪ Track - Artist ♪");
+    }
+
+    [Fact]
     public void TryGetTitle_MalformedJson_ReturnsFalse()
     {
         var pluginInterface = Substitute.For<IDalamudPluginInterface>();

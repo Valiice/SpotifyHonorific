@@ -63,7 +63,10 @@ public sealed class RecentTitleCache
         samples.Add(new Sample { Text = cleanedTitle, SeenAt = seenAt });
         if (samples.Count > MaxDistinctValues)
         {
-            samples.RemoveAt(0);
+            // Evict by SeenAt, not list position: re-seeing an existing sample
+            // refreshes its timestamp in place without moving it, so the list
+            // head is not necessarily the oldest sample.
+            samples.Remove(samples.MinBy(s => s.SeenAt)!);
         }
     }
 

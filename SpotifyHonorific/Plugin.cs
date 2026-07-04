@@ -63,7 +63,7 @@ public sealed class Plugin : IDalamudPlugin
         NearbyTrackContextMenu = new NearbyTrackContextMenu(ContextMenu, HonorificTitleReader, RecentTitleCache, TrackQueueService, PluginLog, ChatGui);
         SpotifyAuthenticator = new SpotifyAuthenticator(Config, PluginLog);
         var nearbyListeningView = new NearbyListeningView(NearbyTitleWatcher, RecentTitleCache, TrackQueueService, ChatGui);
-        ConfigWindow = new ConfigWindow(Config, new(), Updater, SpotifyAuthenticator, PlaybackState, nearbyListeningView);
+        ConfigWindow = new ConfigWindow(Config, new(), Updater, SpotifyAuthenticator, SpotifyPollingService, PlaybackState, nearbyListeningView);
         NearbyListeningWindow = new NearbyListeningWindow(nearbyListeningView);
 
         WindowSystem.AddWindow(ConfigWindow);

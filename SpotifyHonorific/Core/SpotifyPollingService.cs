@@ -24,6 +24,11 @@ public class SpotifyPollingService
 
     private SpotifyClient? _spotify;
     private string? _currentAccessToken;
+    // Serializes the check-then-refresh below. The service is shared between
+    // the poll loop and on-demand queue actions; two concurrent refreshes
+    // would race with the same single-use PKCE refresh token, and the loser's
+    // 400 would wipe the token the winner just saved.
+    private readonly SemaphoreSlim _refreshLock = new(1, 1);
 
     private int _apiCallCount;
     private int _apiErrorCount;
@@ -113,23 +118,24 @@ public class SpotifyPollingService
 
     private async Task<SpotifyClient?> GetSpotifyClientAsync(CancellationToken cancellationToken = default)
     {
-        var (refreshToken, clientId, lastAuthTime) = _config.WithLock(() =>
-            (_config.SpotifyRefreshToken, _config.SpotifyClientId, _config.LastSpotifyAuthTime));
-
-        if (refreshToken.IsNullOrWhitespace() || clientId.IsNullOrWhitespace())
-        {
-            return null;
-        }
-
-        if (_spotify != null && _currentAccessToken != null && lastAuthTime.AddMinutes(TOKEN_REFRESH_WINDOW_MINUTES) > DateTime.Now)
-        {
-            return _spotify;
-        }
-
-        _pluginLog.Debug("Spotify token expired or missing, requesting new one...");
-
+        await _refreshLock.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
+            var (refreshToken, clientId, lastAuthTime) = _config.WithLock(() =>
+                (_config.SpotifyRefreshToken, _config.SpotifyClientId, _config.LastSpotifyAuthTime));
+
+            if (refreshToken.IsNullOrWhitespace() || clientId.IsNullOrWhitespace())
+            {
+                return null;
+            }
+
+            if (_spotify != null && _currentAccessToken != null && lastAuthTime.AddMinutes(TOKEN_REFRESH_WINDOW_MINUTES) > DateTime.Now)
+            {
+                return _spotify;
+            }
+
+            _pluginLog.Debug("Spotify token expired or missing, requesting new one...");
+
             var response = await new OAuthClient().RequestToken(
                 new PKCETokenRefreshRequest(clientId, refreshToken),
                 cancellationToken
@@ -160,12 +166,20 @@ public class SpotifyPollingService
             });
             return null;
         }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
         catch (Exception e)
         {
             _pluginLog.Warning(e, "Transient error refreshing Spotify token, will retry next poll cycle.");
             _spotify = null;
             _currentAccessToken = null;
             return null;
+        }
+        finally
+        {
+            _refreshLock.Release();
         }
     }
 

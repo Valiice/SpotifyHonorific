@@ -52,22 +52,25 @@ public sealed class HonorificTitleReader : IHonorificTitleReader
     {
         title = string.Empty;
 
-        JObject data;
         try
         {
-            data = JObject.Parse(rawJson);
+            var data = JObject.Parse(rawJson);
+
+            // ToObject<bool?> tolerates a literal JSON null (a non-null JValue
+            // that ?. does not short-circuit on), which ToObject<bool> would
+            // throw for — the payload comes from another plugin's IPC, so its
+            // exact shape isn't under our control.
+            if (data["IsOriginal"]?.ToObject<bool?>() == true) return false;
+
+            var extracted = data["Title"]?.ToString();
+            if (string.IsNullOrWhiteSpace(extracted)) return false;
+
+            title = extracted;
+            return true;
         }
         catch (JsonException)
         {
             return false;
         }
-
-        if (data["IsOriginal"]?.ToObject<bool>() == true) return false;
-
-        var extracted = data["Title"]?.ToString();
-        if (string.IsNullOrWhiteSpace(extracted)) return false;
-
-        title = extracted;
-        return true;
     }
 }
