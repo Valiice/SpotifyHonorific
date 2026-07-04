@@ -38,6 +38,12 @@ public class NearbyListeningView
             ImGui.SetTooltip("Best-effort guess based on music symbols (♪) or a \"Track - Artist\" pattern in the title. Not reliable — Honorific titles are free text with no way to tell what set them.");
         }
 
+        // Most titles cycle between track and artist phases; a queue attempt
+        // before both have been observed can only search with half the info.
+        ImGui.PushTextWrapPos(0);
+        ImGui.TextDisabled("Tip: song matching needs to see both the track and artist in a player's cycling title. Wait a few seconds after someone appears before queueing for the best result.");
+        ImGui.PopTextWrapPos();
+
         var entries = _nearbyTitleWatcher.History
             .Where(e => !_onlyShowLikelySongs
                 || SongTitleHeuristic.LooksLikeSong(e.RawTitle)
