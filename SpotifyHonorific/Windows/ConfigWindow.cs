@@ -28,7 +28,9 @@ public class ConfigWindow : Window
     private ImGuiHelper ImGuiHelper { get; init; }
     private Updater Updater { get; init; }
     private SpotifyAuthenticator SpotifyAuthenticator { get; init; }
+    private SpotifyPollingService SpotifyPollingService { get; init; }
     private PlaybackState PlaybackState { get; init; }
+    private NearbyListeningView NearbyListeningView { get; init; }
 
     private string _spotifyClientIdBuffer = string.Empty;
 
@@ -44,7 +46,7 @@ public class ConfigWindow : Window
     private static readonly string RecreateText = "Recreate Defaults";
     private static readonly System.Reflection.PropertyInfo[] UpdaterContextProperties = typeof(UpdaterContext).GetProperties();
 
-    public ConfigWindow(Config config, ImGuiHelper imGuiHelper, Updater updater, SpotifyAuthenticator spotifyAuthenticator, PlaybackState playbackState) : base("Spotify Activity Honorific Config##configWindow")
+    public ConfigWindow(Config config, ImGuiHelper imGuiHelper, Updater updater, SpotifyAuthenticator spotifyAuthenticator, SpotifyPollingService spotifyPollingService, PlaybackState playbackState, NearbyListeningView nearbyListeningView) : base("Spotify Activity Honorific Config##configWindow")
     {
         SizeConstraints = new WindowSizeConstraints
         {
@@ -56,7 +58,9 @@ public class ConfigWindow : Window
         ImGuiHelper = imGuiHelper;
         Updater = updater;
         SpotifyAuthenticator = spotifyAuthenticator;
+        SpotifyPollingService = spotifyPollingService;
         PlaybackState = playbackState;
+        NearbyListeningView = nearbyListeningView;
 
         _spotifyClientIdBuffer = Config.SpotifyClientId;
     }
@@ -83,6 +87,12 @@ public class ConfigWindow : Window
             {
                 ImGui.Spacing();
                 DrawAccountTab();
+                ImGui.EndTabItem();
+            }
+            if (ImGui.BeginTabItem("Nearby"))
+            {
+                ImGui.Spacing();
+                NearbyListeningView.Draw();
                 ImGui.EndTabItem();
             }
             ImGui.EndTabBar();
@@ -775,7 +785,15 @@ public class ConfigWindow : Window
         _authInProgress = true;
         try
         {
-            await SpotifyAuthenticator.AuthenticateAsync().ConfigureAwait(false);
+            var success = await SpotifyAuthenticator.AuthenticateAsync().ConfigureAwait(false);
+            if (success)
+            {
+                // Drop the cached client so the next API call refreshes with
+                // the new grant immediately, without this, re-authenticating
+                // (e.g. to pick up a newly added scope) keeps serving the old
+                // access token for up to another 55 minutes.
+                SpotifyPollingService.ResetClient();
+            }
         }
         finally
         {

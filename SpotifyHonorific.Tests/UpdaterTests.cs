@@ -242,7 +242,7 @@ public class AuthNotificationTests
         shouldNotify.Should().BeFalse();
         timer.Should().BeApproximately(300, 0.001);
 
-        // Second call: another 300s, now at 600 — should fire
+        // Second call: another 300s, now at 600, should fire
         (shouldNotify, timer) = Updater.CheckAuthNotificationDue(timer, 300, Cooldown, true);
         shouldNotify.Should().BeTrue();
         timer.Should().Be(0);
