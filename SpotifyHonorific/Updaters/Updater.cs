@@ -124,7 +124,7 @@ public class Updater : IDisposable
         UpdateMusicOffTimer(deltaSeconds);
 
         // Nearby scanning respects the plugin's on/off toggle like everything
-        // else — a disabled plugin shouldn't keep firing IPC reads for every
+        // else, a disabled plugin shouldn't keep firing IPC reads for every
         // nearby player.
         if (_config.Enabled)
         {

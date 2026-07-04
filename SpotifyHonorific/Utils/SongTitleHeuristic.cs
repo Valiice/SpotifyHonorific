@@ -16,7 +16,7 @@ public static partial class SongTitleHeuristic
 
     // Best-effort only: Honorific titles are arbitrary user-configured text
     // with no metadata saying which plugin set them or what they represent,
-    // so this can never be a reliable classifier — it just reduces noise.
+    // so this can never be a reliable classifier, it just reduces noise.
     public static bool LooksLikeSong(string title)
     {
         if (string.IsNullOrWhiteSpace(title)) return false;

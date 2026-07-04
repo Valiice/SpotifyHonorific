@@ -8,7 +8,7 @@ namespace SpotifyHonorific.Core;
 // Tracks, per character, the last couple of distinct "real" (non-placeholder)
 // title samples seen recently. The default SpotifyHonorific template cycles
 // every ~10s between a "Listening to Spotify" placeholder, the track name,
-// and the artist name — sampling this plugin's own 3s poll over one cycle
+// and the artist name, sampling this plugin's own 3s poll over one cycle
 // naturally captures both the track and artist phases, which can then be
 // combined into a much better Spotify search query than whatever single
 // phase happens to be showing at the exact moment someone right-clicks.
@@ -36,7 +36,7 @@ public sealed class RecentTitleCache
         if (SpotifyPlaceholderDetector.IsPlaceholder(cleanedTitle))
         {
             // The placeholder phase carries no song info, but seeing it at all
-            // proves this character runs SpotifyHonorific — remember that so
+            // proves this character runs SpotifyHonorific, remember that so
             // the window's song filter can pass them regardless of what
             // symbols their template uses.
             _knownSpotifyListeners.Add(characterName);
@@ -72,7 +72,7 @@ public sealed class RecentTitleCache
 
     public bool IsKnownSpotifyListener(string characterName) => _knownSpotifyListeners.Contains(characterName);
 
-    // The individual fresh sample texts, oldest first — used as match hints
+    // The individual fresh sample texts, oldest first, used as match hints
     // so the queue action can prefer a search result whose track name equals
     // something we actually saw in the player's title.
     public IReadOnlyList<string> GetFreshSamples(string characterName, DateTime now)

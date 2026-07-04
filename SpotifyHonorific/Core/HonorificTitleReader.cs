@@ -16,7 +16,7 @@ public sealed class HonorificTitleReader : IHonorificTitleReader
 {
     // Without a backoff, a missing Honorific plugin means every nearby player
     // triggers a thrown-and-caught IPC exception plus a log line every watcher
-    // tick, forever — thousands per hour in a crowded zone for an operation
+    // tick, forever, thousands per hour in a crowded zone for an operation
     // that can't succeed until the user installs Honorific and reloads.
     private const int IPC_FAILURE_BACKOFF_SECONDS = 60;
 
@@ -56,7 +56,7 @@ public sealed class HonorificTitleReader : IHonorificTitleReader
     // Honorific.GetCharacterTitle returns the full title-data JSON (the same
     // schema used to set a title), not plain text. IsOriginal:true means the
     // title is one of the character's real, unlocked in-game titles just
-    // re-rendered by Honorific rather than custom text — those aren't song
+    // re-rendered by Honorific rather than custom text, those aren't song
     // titles, so they're excluded here.
     internal static bool TryExtractCustomTitle(string rawJson, out string title)
     {
@@ -68,7 +68,7 @@ public sealed class HonorificTitleReader : IHonorificTitleReader
 
             // ToObject<bool?> tolerates a literal JSON null (a non-null JValue
             // that ?. does not short-circuit on), which ToObject<bool> would
-            // throw for — the payload comes from another plugin's IPC, so its
+            // throw for, the payload comes from another plugin's IPC, so its
             // exact shape isn't under our control.
             if (data["IsOriginal"]?.ToObject<bool?>() == true) return false;
 

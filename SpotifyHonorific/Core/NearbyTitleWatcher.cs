@@ -34,7 +34,7 @@ public sealed class NearbyTitleWatcher
 
         var now = DateTime.Now;
         // Index 0 is always the local player (see Updater.cs character index 0
-        // usage for Honorific.SetCharacterTitle/ClearCharacterTitle) — skip it.
+        // usage for Honorific.SetCharacterTitle/ClearCharacterTitle), skip it.
         for (var i = 1; i < _objectTable.Length; i++)
         {
             if (_objectTable[i] is not IPlayerCharacter playerCharacter) continue;

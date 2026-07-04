@@ -35,7 +35,7 @@ public class NearbyListeningView
         ImGui.Checkbox("Only show likely song titles", ref _onlyShowLikelySongs);
         if (ImGui.IsItemHovered())
         {
-            ImGui.SetTooltip("Best-effort guess based on music symbols (♪) or a \"Track - Artist\" pattern in the title. Not reliable — Honorific titles are free text with no way to tell what set them.");
+            ImGui.SetTooltip("Best-effort guess based on music symbols (♪) or a \"Track - Artist\" pattern in the title. Not reliable, Honorific titles are free text with no way to tell what set them.");
         }
 
         // Most titles cycle between track and artist phases; a queue attempt
@@ -89,7 +89,7 @@ public class NearbyListeningView
                 var query = _recentTitleCache.BuildSearchQuery(entry.CharacterName, DateTime.Now);
                 ImGui.SetTooltip(query != null
                     ? $"Spotify will search for: {query}"
-                    : "Nothing usable seen yet — wait a few seconds for their title to cycle.");
+                    : "Nothing usable seen yet, wait a few seconds for their title to cycle.");
             }
         }
 
@@ -99,7 +99,7 @@ public class NearbyListeningView
     private void DrawTitleCell(NearbyPlayerEntry entry)
     {
         // Mid-cycle no-info phases ("Listening to Spotify", playback timers)
-        // aren't worth displaying — show the last real song text we cached
+        // aren't worth displaying, show the last real song text we cached
         // for this character instead, when we have it.
         if (SpotifyPlaceholderDetector.IsNoInfoPhase(TitleTextCleaner.Clean(entry.RawTitle)))
         {
@@ -120,7 +120,7 @@ public class NearbyListeningView
         var query = _recentTitleCache.BuildSearchQuery(characterName, now);
         if (query == null)
         {
-            _chatGui.Print("SpotifyHonorific: Haven't seen their song info yet — wait a few seconds and try again.");
+            _chatGui.Print("SpotifyHonorific: Haven't seen their song info yet, wait a few seconds and try again.");
             return;
         }
 

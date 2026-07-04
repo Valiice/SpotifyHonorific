@@ -67,7 +67,7 @@ public class RecentTitleCacheTests
     {
         // Re-seeing a sample refreshes its SeenAt in place without moving it
         // in the list, so evicting the positional head would remove the
-        // refreshed (newer) sample and keep a stale one — which then gets
+        // refreshed (newer) sample and keep a stale one, which then gets
         // combined into a corrupted cross-song query.
         var cache = new RecentTitleCache();
 

@@ -44,7 +44,7 @@ public class NearbyTitleHistoryTests
         }
         history.Entries.Should().HaveCount(100);
 
-        // Player0 has the oldest LastSeen (baseTime) — adding one more new
+        // Player0 has the oldest LastSeen (baseTime), adding one more new
         // character beyond the cap should evict it specifically.
         history.Upsert("Player100", "title", baseTime.AddSeconds(100));
 

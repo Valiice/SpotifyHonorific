@@ -789,7 +789,7 @@ public class ConfigWindow : Window
             if (success)
             {
                 // Drop the cached client so the next API call refreshes with
-                // the new grant immediately — without this, re-authenticating
+                // the new grant immediately, without this, re-authenticating
                 // (e.g. to pick up a newly added scope) keeps serving the old
                 // access token for up to another 55 minutes.
                 SpotifyPollingService.ResetClient();

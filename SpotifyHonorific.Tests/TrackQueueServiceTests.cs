@@ -12,7 +12,7 @@ public class TrackQueueServiceTests
     public void PickBestMatch_HintExactlyMatchesLaterResult_PrefersItOverTopHit()
     {
         // Spotify ranked the romanized release first, but the player's title
-        // showed the Japanese one — the exact hint match must win.
+        // showed the Japanese one, the exact hint match must win.
         var tracks = new[] { MakeTrack("Usseewa"), MakeTrack("うっせぇわ") };
 
         var picked = TrackQueueService.PickBestMatch(tracks, ["うっせぇわ", "Ado"]);

@@ -53,7 +53,7 @@ public sealed class NearbyTrackContextMenu : IDisposable
     private void HandleQueueClicked(int objectIndex, string characterName)
     {
         // Prefer the cache of recent non-placeholder samples over a single
-        // fresh read — the title may be mid-cycle showing "Listening to
+        // fresh read, the title may be mid-cycle showing "Listening to
         // Spotify" or just one of track/artist at the exact click moment,
         // while the cache can combine both phases into a better query.
         var now = DateTime.Now;
@@ -75,6 +75,6 @@ public sealed class NearbyTrackContextMenu : IDisposable
         }
 
         _pluginLog.Debug("No usable song title seen yet for context menu target.");
-        _chatGui.Print("SpotifyHonorific: Haven't seen their song info yet — wait a few seconds and try again.");
+        _chatGui.Print("SpotifyHonorific: Haven't seen their song info yet, wait a few seconds and try again.");
     }
 }

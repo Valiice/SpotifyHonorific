@@ -29,7 +29,7 @@ public class HonorificTitleReaderTests
     public void TryGetTitle_OriginalInGameTitleJson_ReturnsFalse()
     {
         // IsOriginal:true means this is a real unlocked in-game title just
-        // rendered by Honorific, not custom text — not a song, filter it out.
+        // rendered by Honorific, not custom text, not a song, filter it out.
         var pluginInterface = Substitute.For<IDalamudPluginInterface>();
         var subscriber = Substitute.For<ICallGateSubscriber<int, string>>();
         subscriber.InvokeFunc(5).Returns("""{"Title":"Winged Death","IsPrefix":true,"IsOriginal":true,"Color":null}""");
@@ -62,7 +62,7 @@ public class HonorificTitleReaderTests
     [Fact]
     public void TryGetTitle_IsOriginalIsJsonNull_TreatedAsCustomTitleWithoutThrowing()
     {
-        // The payload comes from another plugin over IPC — a literal JSON
+        // The payload comes from another plugin over IPC, a literal JSON
         // null for IsOriginal is a non-null JValue that ?. does not
         // short-circuit on, and must not crash the framework-thread tick.
         var pluginInterface = Substitute.For<IDalamudPluginInterface>();
