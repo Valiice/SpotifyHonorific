@@ -29,6 +29,7 @@ public class ConfigWindow : Window
     private Updater Updater { get; init; }
     private SpotifyAuthenticator SpotifyAuthenticator { get; init; }
     private PlaybackState PlaybackState { get; init; }
+    private NearbyListeningView NearbyListeningView { get; init; }
 
     private string _spotifyClientIdBuffer = string.Empty;
 
@@ -44,7 +45,7 @@ public class ConfigWindow : Window
     private static readonly string RecreateText = "Recreate Defaults";
     private static readonly System.Reflection.PropertyInfo[] UpdaterContextProperties = typeof(UpdaterContext).GetProperties();
 
-    public ConfigWindow(Config config, ImGuiHelper imGuiHelper, Updater updater, SpotifyAuthenticator spotifyAuthenticator, PlaybackState playbackState) : base("Spotify Activity Honorific Config##configWindow")
+    public ConfigWindow(Config config, ImGuiHelper imGuiHelper, Updater updater, SpotifyAuthenticator spotifyAuthenticator, PlaybackState playbackState, NearbyListeningView nearbyListeningView) : base("Spotify Activity Honorific Config##configWindow")
     {
         SizeConstraints = new WindowSizeConstraints
         {
@@ -57,6 +58,7 @@ public class ConfigWindow : Window
         Updater = updater;
         SpotifyAuthenticator = spotifyAuthenticator;
         PlaybackState = playbackState;
+        NearbyListeningView = nearbyListeningView;
 
         _spotifyClientIdBuffer = Config.SpotifyClientId;
     }
@@ -83,6 +85,12 @@ public class ConfigWindow : Window
             {
                 ImGui.Spacing();
                 DrawAccountTab();
+                ImGui.EndTabItem();
+            }
+            if (ImGui.BeginTabItem("Nearby"))
+            {
+                ImGui.Spacing();
+                NearbyListeningView.Draw();
                 ImGui.EndTabItem();
             }
             ImGui.EndTabBar();
