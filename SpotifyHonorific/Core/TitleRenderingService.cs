@@ -45,7 +45,7 @@ public class TitleRenderingService
             {
                 var message = $"Title '{title}' is longer than {MAX_TITLE_LENGTH} characters, it won't be applied by honorific. Trim whitespaces or truncate variables to reduce the length.";
                 _pluginLog.Error(message);
-                _chatGui.PrintError(message, "DiscordActivityHonorific");
+                _chatGui.PrintError(message, "SpotifyHonorific");
                 _displayedMaxLengthError = true;
             }
             return null;
