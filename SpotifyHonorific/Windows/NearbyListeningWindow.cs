@@ -77,7 +77,7 @@ public class NearbyListeningWindow : Window
             ImGui.TableNextColumn();
             ImGui.TextUnformatted(entry.CharacterName);
             ImGui.TableNextColumn();
-            ImGui.TextUnformatted(entry.RawTitle);
+            DrawTitleCell(entry);
             ImGui.TableNextColumn();
             ImGui.TextUnformatted(entry.LastSeen.ToString("T"));
             ImGui.TableNextColumn();
@@ -88,6 +88,24 @@ public class NearbyListeningWindow : Window
         }
 
         ImGui.EndTable();
+    }
+
+    private void DrawTitleCell(NearbyPlayerEntry entry)
+    {
+        // Mid-cycle no-info phases ("Listening to Spotify", playback timers)
+        // aren't worth displaying — show the last real song text we cached
+        // for this character instead, when we have it.
+        if (SpotifyPlaceholderDetector.IsNoInfoPhase(TitleTextCleaner.Clean(entry.RawTitle)))
+        {
+            var lastKnown = _recentTitleCache.BuildSearchQuery(entry.CharacterName, DateTime.Now);
+            if (lastKnown != null)
+            {
+                ImGui.TextDisabled($"{lastKnown} (last seen)");
+                return;
+            }
+        }
+
+        ImGui.TextUnformatted(entry.RawTitle);
     }
 
     private void QueueForCharacter(string characterName)

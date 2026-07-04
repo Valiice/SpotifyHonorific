@@ -120,6 +120,29 @@ public class RecentTitleCacheTests
     }
 
     [Fact]
+    public void Record_PlaybackTimerJunk_NotRecorded()
+    {
+        // "02:56 / 04:04" cleans to "0256 0404"; caching it produced garbage
+        // search queries that matched essentially random songs.
+        var cache = new RecentTitleCache();
+
+        cache.Record("Maki Shimada", "0256 0404", BaseTime);
+
+        cache.BuildSearchQuery("Maki Shimada", BaseTime).Should().BeNull();
+    }
+
+    [Fact]
+    public void Record_PlaybackTimerJunk_DoesNotPolluteExistingSamples()
+    {
+        var cache = new RecentTitleCache();
+
+        cache.Record("Maki Shimada", "The Phoenix", BaseTime);
+        cache.Record("Maki Shimada", "0256 0404", BaseTime.AddSeconds(10));
+
+        cache.BuildSearchQuery("Maki Shimada", BaseTime.AddSeconds(10)).Should().Be("The Phoenix");
+    }
+
+    [Fact]
     public void Record_Placeholder_MarksCharacterAsKnownSpotifyListener()
     {
         var cache = new RecentTitleCache();

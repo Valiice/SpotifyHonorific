@@ -43,6 +43,8 @@ public sealed class RecentTitleCache
             return;
         }
 
+        if (SpotifyPlaceholderDetector.IsNoInfoPhase(cleanedTitle)) return;
+
         if (!_samplesByCharacter.TryGetValue(characterName, out var samples))
         {
             samples = new List<Sample>();

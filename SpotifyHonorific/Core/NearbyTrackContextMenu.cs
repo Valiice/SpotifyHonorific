@@ -65,7 +65,7 @@ public sealed class NearbyTrackContextMenu : IDisposable
         if (_titleReader.TryGetTitle(objectIndex, out var title))
         {
             var cleaned = TitleTextCleaner.Clean(title);
-            if (!SpotifyPlaceholderDetector.IsPlaceholder(cleaned) && !string.IsNullOrWhiteSpace(cleaned))
+            if (!SpotifyPlaceholderDetector.IsNoInfoPhase(cleaned))
             {
                 _ = _trackQueueService.QueueTrackFromTitleAsync(title);
                 return;
