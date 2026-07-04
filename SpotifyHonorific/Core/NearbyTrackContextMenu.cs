@@ -55,10 +55,11 @@ public sealed class NearbyTrackContextMenu : IDisposable
         // fresh read — the title may be mid-cycle showing "Listening to
         // Spotify" or just one of track/artist at the exact click moment,
         // while the cache can combine both phases into a better query.
-        var query = _recentTitleCache.BuildSearchQuery(characterName, DateTime.Now);
+        var now = DateTime.Now;
+        var query = _recentTitleCache.BuildSearchQuery(characterName, now);
         if (query != null)
         {
-            _ = _trackQueueService.QueueTrackFromTitleAsync(query);
+            _ = _trackQueueService.QueueTrackFromTitleAsync(query, _recentTitleCache.GetFreshSamples(characterName, now));
             return;
         }
 

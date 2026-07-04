@@ -69,6 +69,20 @@ public sealed class RecentTitleCache
 
     public bool IsKnownSpotifyListener(string characterName) => _knownSpotifyListeners.Contains(characterName);
 
+    // The individual fresh sample texts, oldest first — used as match hints
+    // so the queue action can prefer a search result whose track name equals
+    // something we actually saw in the player's title.
+    public IReadOnlyList<string> GetFreshSamples(string characterName, DateTime now)
+    {
+        if (!_samplesByCharacter.TryGetValue(characterName, out var samples)) return [];
+
+        return samples
+            .Where(s => (now - s.SeenAt).TotalSeconds <= MaxAgeSeconds)
+            .OrderBy(s => s.SeenAt)
+            .Select(s => s.Text)
+            .ToList();
+    }
+
     public string? BuildSearchQuery(string characterName, DateTime now)
     {
         if (!_samplesByCharacter.TryGetValue(characterName, out var samples)) return null;

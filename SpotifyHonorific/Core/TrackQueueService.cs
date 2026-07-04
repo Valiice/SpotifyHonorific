@@ -2,6 +2,7 @@ using Dalamud.Plugin.Services;
 using SpotifyAPI.Web;
 using SpotifyHonorific.Utils;
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Threading.Tasks;
@@ -10,6 +11,8 @@ namespace SpotifyHonorific.Core;
 
 public class TrackQueueService
 {
+    private const int SEARCH_RESULT_LIMIT = 5;
+
     private readonly SpotifyPollingService _pollingService;
     private readonly IPluginLog _pluginLog;
     private readonly IChatGui _chatGui;
@@ -21,7 +24,7 @@ public class TrackQueueService
         _chatGui = chatGui;
     }
 
-    public async Task QueueTrackFromTitleAsync(string rawTitle)
+    public async Task QueueTrackFromTitleAsync(string rawTitle, IReadOnlyList<string>? titleHints = null)
     {
         var query = TitleTextCleaner.Clean(rawTitle);
         if (string.IsNullOrWhiteSpace(query))
@@ -40,14 +43,16 @@ public class TrackQueueService
             }
 
             var searchResponse = await spotify.Search
-                .Item(new SearchRequest(SearchRequest.Types.Track, query) { Limit = 1 })
+                .Item(new SearchRequest(SearchRequest.Types.Track, query) { Limit = SEARCH_RESULT_LIMIT })
                 .ConfigureAwait(false);
-            var track = searchResponse.Tracks?.Items?.FirstOrDefault();
-            if (track == null)
+            var tracks = searchResponse.Tracks?.Items;
+            if (tracks == null || tracks.Count == 0)
             {
                 _chatGui.Print($"SpotifyHonorific: No track found for \"{query}\".");
                 return;
             }
+
+            var track = PickBestMatch(tracks, titleHints ?? [query]);
 
             await spotify.Player.AddToQueue(new PlayerAddToQueueRequest(track.Uri)).ConfigureAwait(false);
             var artistNames = string.Join(", ", track.Artists.Select(a => a.Name));
@@ -63,5 +68,27 @@ public class TrackQueueService
             _pluginLog.Error(e, "Failed to queue track from nearby title.");
             _chatGui.PrintError("SpotifyHonorific: Failed to queue track. Check /xllog for details.");
         }
+    }
+
+    // Spotify's ranking sometimes puts a different release of the same song
+    // first (e.g. a romanized "Usseewa" over the Japanese-titled "うっせぇわ"
+    // the player's title actually showed). Prefer the result whose name
+    // matches one of the title texts we actually saw, falling back to
+    // Spotify's top hit.
+    internal static FullTrack PickBestMatch(IReadOnlyList<FullTrack> tracks, IReadOnlyList<string> titleHints)
+    {
+        foreach (var hint in titleHints)
+        {
+            var exact = tracks.FirstOrDefault(t => string.Equals(t.Name, hint.Trim(), StringComparison.OrdinalIgnoreCase));
+            if (exact != null) return exact;
+        }
+
+        foreach (var hint in titleHints)
+        {
+            var partial = tracks.FirstOrDefault(t => hint.Contains(t.Name, StringComparison.OrdinalIgnoreCase));
+            if (partial != null) return partial;
+        }
+
+        return tracks[0];
     }
 }

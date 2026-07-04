@@ -117,13 +117,14 @@ public class NearbyListeningWindow : Window
 
     private void QueueForCharacter(string characterName)
     {
-        var query = _recentTitleCache.BuildSearchQuery(characterName, DateTime.Now);
+        var now = DateTime.Now;
+        var query = _recentTitleCache.BuildSearchQuery(characterName, now);
         if (query == null)
         {
             _chatGui.Print("SpotifyHonorific: Haven't seen their song info yet — wait a few seconds and try again.");
             return;
         }
 
-        _ = _trackQueueService.QueueTrackFromTitleAsync(query);
+        _ = _trackQueueService.QueueTrackFromTitleAsync(query, _recentTitleCache.GetFreshSamples(characterName, now));
     }
 }
