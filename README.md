@@ -120,6 +120,10 @@ This cycles between "Listening to Spotify", the Song Name, and the Artist Name e
   * **"Spotify client is null"?** Your authentication token may have expired. Go to the config and click "Authenticate with Spotify" again.
   * **Not updating while AFK?** Polling only pauses when your in-game online status is **Away from Keyboard** and Spotify isn't playing anything. See the *Behavior* section above for the conditions that flip that status. Desktop-only idle (e.g. alt-tabbed) does not pause polling.
 
+## Credits
+
+Originally based on [DiscordActivityHonorific](https://github.com/anya-hichu/DiscordActivityHonorific) by anya-hichu — the codebase has since been almost entirely rewritten, but that project was the starting point and inspiration.
+
 ## License & Copyright
 
 Copyright © 2024–2026 Valiice
