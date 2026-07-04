@@ -46,7 +46,9 @@ public class NearbyListeningWindow : Window
         }
 
         var entries = _nearbyTitleWatcher.History
-            .Where(e => !_onlyShowLikelySongs || SongTitleHeuristic.LooksLikeSong(e.RawTitle))
+            .Where(e => !_onlyShowLikelySongs
+                || SongTitleHeuristic.LooksLikeSong(e.RawTitle)
+                || _recentTitleCache.IsKnownSpotifyListener(e.CharacterName))
             .Where(e => string.IsNullOrEmpty(_searchFilter) || e.RawTitle.Contains(_searchFilter, StringComparison.OrdinalIgnoreCase))
             .ToList();
 

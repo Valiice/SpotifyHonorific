@@ -23,6 +23,8 @@ public static partial class SongTitleHeuristic
 
         if (MusicSymbols.Any(title.Contains)) return true;
 
-        return TrackArtistSeparatorPattern().IsMatch(title);
+        return HasTrackArtistPattern(title);
     }
+
+    public static bool HasTrackArtistPattern(string title) => TrackArtistSeparatorPattern().IsMatch(title);
 }

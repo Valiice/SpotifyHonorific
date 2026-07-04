@@ -125,5 +125,6 @@ public class NearbyTitleWatcherTests
         watcher.Update(3.0);
 
         recentTitleCache.BuildSearchQuery("Xm'zora Tia", DateTime.Now).Should().BeNull();
+        recentTitleCache.IsKnownSpotifyListener("Xm'zora Tia").Should().BeTrue();
     }
 }

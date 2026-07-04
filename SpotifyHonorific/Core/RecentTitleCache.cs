@@ -16,6 +16,9 @@ public sealed class RecentTitleCache
 {
     private const int MaxDistinctValues = 2;
     private const double MaxAgeSeconds = 40.0;
+    // Phases of the default template are ~10s apart within one ~30s cycle;
+    // two samples further apart than this likely straddle a song change.
+    private const double SameCycleWindowSeconds = 15.0;
 
     private sealed class Sample
     {
@@ -24,11 +27,21 @@ public sealed class RecentTitleCache
     }
 
     private readonly Dictionary<string, List<Sample>> _samplesByCharacter = new();
+    private readonly HashSet<string> _knownSpotifyListeners = new();
 
-    public void RecordIfUseful(string characterName, string cleanedTitle, DateTime seenAt)
+    public void Record(string characterName, string cleanedTitle, DateTime seenAt)
     {
         if (string.IsNullOrWhiteSpace(cleanedTitle)) return;
-        if (SpotifyPlaceholderDetector.IsPlaceholder(cleanedTitle)) return;
+
+        if (SpotifyPlaceholderDetector.IsPlaceholder(cleanedTitle))
+        {
+            // The placeholder phase carries no song info, but seeing it at all
+            // proves this character runs SpotifyHonorific — remember that so
+            // the window's song filter can pass them regardless of what
+            // symbols their template uses.
+            _knownSpotifyListeners.Add(characterName);
+            return;
+        }
 
         if (!_samplesByCharacter.TryGetValue(characterName, out var samples))
         {
@@ -52,15 +65,31 @@ public sealed class RecentTitleCache
         }
     }
 
+    public bool IsKnownSpotifyListener(string characterName) => _knownSpotifyListeners.Contains(characterName);
+
     public string? BuildSearchQuery(string characterName, DateTime now)
     {
         if (!_samplesByCharacter.TryGetValue(characterName, out var samples)) return null;
 
         var fresh = samples
             .Where(s => (now - s.SeenAt).TotalSeconds <= MaxAgeSeconds)
-            .Select(s => s.Text)
+            .OrderBy(s => s.SeenAt)
             .ToList();
 
-        return fresh.Count == 0 ? null : string.Join(" ", fresh);
+        if (fresh.Count == 0) return null;
+
+        var newest = fresh[^1];
+
+        // A sample already containing a "Track - Artist" pattern is complete
+        // on its own; appending an older sample only risks polluting the
+        // query with text left over from a previous song.
+        if (SongTitleHeuristic.HasTrackArtistPattern(newest.Text)) return newest.Text;
+
+        if (fresh.Count == 1) return newest.Text;
+
+        var previous = fresh[^2];
+        if ((newest.SeenAt - previous.SeenAt).TotalSeconds > SameCycleWindowSeconds) return newest.Text;
+
+        return $"{previous.Text} {newest.Text}";
     }
 }

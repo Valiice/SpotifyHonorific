@@ -42,7 +42,7 @@ public sealed class NearbyTitleWatcher
 
             var characterName = playerCharacter.Name.TextValue;
             _history.Upsert(characterName, title, now);
-            _recentTitleCache.RecordIfUseful(characterName, TitleTextCleaner.Clean(title), now);
+            _recentTitleCache.Record(characterName, TitleTextCleaner.Clean(title), now);
         }
     }
 }
