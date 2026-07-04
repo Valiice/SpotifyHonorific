@@ -63,6 +63,13 @@ public class TrackQueueService
             _pluginLog.Warning(e, "Spotify rejected queue request due to insufficient scope.");
             _chatGui.PrintError("SpotifyHonorific: Queueing needs a Spotify permission this plugin didn't have before. Re-click 'Authenticate with Spotify' in /spotifyhonorific config, then try again.");
         }
+        catch (APIException e) when (e.Response?.StatusCode == HttpStatusCode.NotFound)
+        {
+            // Spotify returns 404 NO_ACTIVE_DEVICE when nothing has played
+            // recently — the queue needs an active playback session to attach to.
+            _pluginLog.Warning(e, "Spotify queue request failed: no active device.");
+            _chatGui.PrintError("SpotifyHonorific: No active Spotify device. Open Spotify and play or pause something first, then try again.");
+        }
         catch (Exception e)
         {
             _pluginLog.Error(e, "Failed to queue track from nearby title.");

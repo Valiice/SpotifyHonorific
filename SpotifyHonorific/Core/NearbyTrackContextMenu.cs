@@ -45,6 +45,7 @@ public sealed class NearbyTrackContextMenu : IDisposable
         args.AddMenuItem(new MenuItem
         {
             Name = "Queue their track (SpotifyHonorific)",
+            PrefixChar = 'S',
             OnClicked = _ => HandleQueueClicked(objectIndex, characterName)
         });
     }
