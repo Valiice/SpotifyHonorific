@@ -24,6 +24,7 @@ public class SpotifyPollingService
 
     private SpotifyClient? _spotify;
     private string? _currentAccessToken;
+    private bool _rateLimitAnnounced;
     // Serializes the check-then-refresh below. The service is shared between
     // the poll loop and on-demand queue actions; two concurrent refreshes
     // would race with the same single-use PKCE refresh token, and the loser's
@@ -79,6 +80,7 @@ public class SpotifyPollingService
             stopwatch.Stop();
             _apiCallCount++;
             RecordResponseTime(stopwatch.ElapsedMilliseconds);
+            RecordPollSuccess();
 
             if (currentlyPlaying?.IsPlaying == true && currentlyPlaying.Item is FullTrack track)
             {
@@ -247,20 +249,29 @@ public class SpotifyPollingService
         }
     }
 
-    private void HandleRateLimit(APITooManyRequestsException e)
+    internal void HandleRateLimit(APITooManyRequestsException e)
     {
         var pause = RateLimitGate.Activate(e.RetryAfter, DateTime.Now);
         var message = $"Spotify rate limit hit (429). Pausing polling for {pause.TotalSeconds:0}s.";
 
         _pluginLog.Warning(e, message);
 
-        if (_config.EnableDebugLogging)
+        // Announce once per episode so users know why their title stopped;
+        // a long rate limit re-arms the gate repeatedly and must not spam chat.
+        if (!_rateLimitAnnounced)
+        {
+            _rateLimitAnnounced = true;
+            _chatGui.PrintError("SpotifyHonorific: Spotify is rate limiting requests. Polling is paused and will resume automatically once the limit clears.");
+        }
+        else if (_config.EnableDebugLogging)
         {
             _chatGui.PrintError($"SpotifyHonorific: {message}");
         }
 
         // The token is fine; keep the client so no refresh traffic is added.
     }
+
+    internal void RecordPollSuccess() => _rateLimitAnnounced = false;
 
     private void HandleError(Exception? e, string message)
     {
