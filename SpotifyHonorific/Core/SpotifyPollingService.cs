@@ -38,6 +38,8 @@ public class SpotifyPollingService
     public int ApiErrorCount => _apiErrorCount;
     public double AverageResponseTime => _apiResponseTimes.Count > 0 ? _apiResponseTimes.Average() : 0;
 
+    internal RateLimitGate RateLimitGate { get; } = new();
+
     public SpotifyPollingService(Config config, IPluginLog pluginLog, IChatGui chatGui)
     {
         _config = config;
@@ -47,6 +49,11 @@ public class SpotifyPollingService
 
     public async Task<FullTrack?> GetCurrentlyPlayingTrackAsync()
     {
+        if (RateLimitGate.IsActive(DateTime.Now))
+        {
+            return null;
+        }
+
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
 
         try
@@ -84,6 +91,12 @@ public class SpotifyPollingService
         {
             _apiErrorCount++;
             HandleError(null, "Spotify API request timed out after 5 seconds.");
+            return null;
+        }
+        catch (APITooManyRequestsException e)
+        {
+            _apiErrorCount++;
+            HandleRateLimit(e);
             return null;
         }
         catch (APIException e)
@@ -183,7 +196,7 @@ public class SpotifyPollingService
         }
     }
 
-    private async Task<T?> RetryAsync<T>(Func<Task<T>> operation, int maxRetries = MAX_RETRY_ATTEMPTS)
+    internal async Task<T?> RetryAsync<T>(Func<Task<T>> operation, int maxRetries = MAX_RETRY_ATTEMPTS)
     {
         for (var attempt = 0; attempt < maxRetries; attempt++)
         {
@@ -194,6 +207,13 @@ public class SpotifyPollingService
             catch (Exception ex)
             {
                 if (attempt == maxRetries - 1)
+                {
+                    throw;
+                }
+
+                // Retrying a 429 in a tight loop keeps the rate limit from
+                // ever clearing; surface it immediately like a 401.
+                if (ex is APITooManyRequestsException)
                 {
                     throw;
                 }
@@ -225,6 +245,21 @@ public class SpotifyPollingService
         {
             _apiResponseTimes.Dequeue();
         }
+    }
+
+    private void HandleRateLimit(APITooManyRequestsException e)
+    {
+        var pause = RateLimitGate.Activate(e.RetryAfter, DateTime.Now);
+        var message = $"Spotify rate limit hit (429). Pausing polling for {pause.TotalSeconds:0}s.";
+
+        _pluginLog.Warning(e, message);
+
+        if (_config.EnableDebugLogging)
+        {
+            _chatGui.PrintError($"SpotifyHonorific: {message}");
+        }
+
+        // The token is fine; keep the client so no refresh traffic is added.
     }
 
     private void HandleError(Exception? e, string message)
