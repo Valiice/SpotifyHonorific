@@ -183,3 +183,26 @@ public class ConfigTests
         readValues.Should().OnlyContain(v => string.IsNullOrEmpty(v) || v.StartsWith("value_"));
     }
 }
+
+public class ConfigRevisionTests
+{
+    [Fact]
+    public void Save_IncrementsRevision()
+    {
+        var mockInterface = Substitute.For<IDalamudPluginInterface>();
+        var config = new Config();
+        config.Initialize(mockInterface);
+
+        var before = config.Revision;
+        config.Save();
+        config.Save();
+
+        config.Revision.Should().Be(before + 2);
+    }
+
+    [Fact]
+    public void Revision_StartsAtZero()
+    {
+        new Config().Revision.Should().Be(0);
+    }
+}

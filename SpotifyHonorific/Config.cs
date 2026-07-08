@@ -1,5 +1,6 @@
 using Dalamud.Configuration;
 using Dalamud.Plugin;
+using Newtonsoft.Json;
 using SpotifyHonorific.Activities;
 using SpotifyHonorific.Configuration;
 using System;
@@ -20,6 +21,11 @@ public class Config : IPluginConfiguration
 
     public int Version { get; set; }
     public bool Enabled { get; set; } = true;
+
+    // Bumped on every Save() so the Updater can detect config edits and rebuild
+    // its cached title action. Runtime-only; never persisted.
+    [JsonIgnore]
+    public int Revision { get; private set; }
 
     public string SpotifyClientId { get; set; } = string.Empty;
     public string SpotifyRefreshToken { get; set; } = string.Empty;
@@ -54,6 +60,7 @@ public class Config : IPluginConfiguration
     {
         lock (_syncLock)
         {
+            Revision++;
             var interfaceToUse = _pluginInterface ?? Plugin.PluginInterface;
             interfaceToUse.SavePluginConfig(this);
         }

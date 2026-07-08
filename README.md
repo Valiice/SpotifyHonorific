@@ -110,6 +110,17 @@ This cycles between "Listening to Spotify", the Song Name, and the Artist Name e
 {{- end -}}♪
 ```
 
+**Cycle Song and Artist only**
+Alternates between the song name (10 seconds) and the artist name (10 seconds), without the "Listening to Spotify" phase.
+
+```scriban
+♪{{- if (Context.SecsElapsed % 20) < 10 -}}
+    {{ Activity.Name | string.truncate 30 }}
+{{- else -}}
+    {{ Activity.Artists[0].Name | string.truncate 30 }}
+{{- end -}}♪
+```
+
 ## Commands
 
   * `/spotifyhonorific config` - Opens the configuration and settings window.

@@ -295,3 +295,75 @@ public class UpdaterConfigSelectionTests
         selectedConfig!.Name.Should().Be("Config2");
     }
 }
+
+public class RenderThrottleTests
+{
+    private const double Interval = 0.5;
+
+    [Fact]
+    public void CheckRenderDue_BelowInterval_ShouldNotRender()
+    {
+        var (shouldRender, newTimer) = Updater.CheckRenderDue(0, 0.016, Interval, true, true);
+        shouldRender.Should().BeFalse();
+        newTimer.Should().BeApproximately(0.016, 0.0001);
+    }
+
+    [Fact]
+    public void CheckRenderDue_AtInterval_ShouldRenderAndResetTimer()
+    {
+        var (shouldRender, newTimer) = Updater.CheckRenderDue(0, Interval, Interval, true, true);
+        shouldRender.Should().BeTrue();
+        newTimer.Should().Be(0);
+    }
+
+    [Fact]
+    public void CheckRenderDue_AccumulatesAcrossFrames()
+    {
+        var timer = 0.0;
+        bool shouldRender;
+
+        (shouldRender, timer) = Updater.CheckRenderDue(timer, 0.3, Interval, true, true);
+        shouldRender.Should().BeFalse();
+
+        (shouldRender, timer) = Updater.CheckRenderDue(timer, 0.3, Interval, true, true);
+        shouldRender.Should().BeTrue();
+        timer.Should().Be(0);
+    }
+
+    [Fact]
+    public void CheckRenderDue_StaticAlreadySent_ShortCircuitsAndPreservesTimer()
+    {
+        // A static title already delivered to Honorific needs zero work,
+        // no matter how much time passes.
+        var (shouldRender, newTimer) = Updater.CheckRenderDue(0.4, 100, Interval, false, true);
+        shouldRender.Should().BeFalse();
+        newTimer.Should().BeApproximately(0.4, 0.0001);
+    }
+
+    [Fact]
+    public void CheckRenderDue_StaticNotYetSent_PreChargedTimer_RendersImmediately()
+    {
+        // New track / zone change pre-charges the timer to the interval so the
+        // first render lands on the very next frame.
+        var (shouldRender, newTimer) = Updater.CheckRenderDue(Interval, 0.016, Interval, false, false);
+        shouldRender.Should().BeTrue();
+        newTimer.Should().Be(0);
+    }
+
+    [Fact]
+    public void CheckRenderDue_StaticNotYetSent_UnchargedTimer_Throttles()
+    {
+        // Failed renders (e.g. title too long) keep alreadySent false; retries
+        // must be throttled, not per-frame.
+        var (shouldRender, newTimer) = Updater.CheckRenderDue(0, 0.016, Interval, false, false);
+        shouldRender.Should().BeFalse();
+        newTimer.Should().BeApproximately(0.016, 0.0001);
+    }
+
+    [Fact]
+    public void RenderIntervals_MatchSpec()
+    {
+        Updater.TEXT_RENDER_INTERVAL_SECONDS.Should().Be(0.5);
+        Updater.RAINBOW_RENDER_INTERVAL_SECONDS.Should().Be(0.1);
+    }
+}

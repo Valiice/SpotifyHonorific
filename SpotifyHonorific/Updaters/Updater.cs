@@ -19,6 +19,8 @@ public class Updater : IDisposable
     private const double AUTH_NOTIFICATION_COOLDOWN_SECONDS = 600.0;
     private const uint AFK_ONLINE_STATUS_ID = 17;
     private const double AFK_MUSIC_GRACE_SECONDS = 10.0;
+    internal const double TEXT_RENDER_INTERVAL_SECONDS = 0.5;
+    internal const double RAINBOW_RENDER_INTERVAL_SECONDS = 0.1;
 
     private readonly IChatGui _chatGui;
     private readonly Config _config;
@@ -48,6 +50,10 @@ public class Updater : IDisposable
     private bool _hasLoggedAfk;
     private double _authNotificationTimer;
     private double _musicOffSeconds;
+    private double _renderTimer;
+    private double _renderInterval = TEXT_RENDER_INTERVAL_SECONDS;
+    private bool _isTitleTimeDependent;
+    private int _lastSeenConfigRevision;
 
     private readonly HashSet<string> _tracksPlayedToday = new(100);
     private readonly DateTime _sessionStartTime;
@@ -74,6 +80,7 @@ public class Updater : IDisposable
         _framework.Update += OnFrameworkUpdate;
         _clientState.TerritoryChanged += OnTerritoryChanged;
         _sessionStartTime = DateTime.Now;
+        _lastSeenConfigRevision = config.Revision;
     }
 
     public string GetPerformanceStats()
@@ -116,6 +123,25 @@ public class Updater : IDisposable
     private void OnTerritoryChanged(uint territoryId)
     {
         _titleState.ForceResend();
+        _renderTimer = _renderInterval; // pre-charge so the re-send lands on the next frame
+    }
+
+    // Config edits mutate the live ActivityConfig instances, and a render-once
+    // static title would freeze those edits. Every edit path ends in
+    // Config.Save(), so a revision bump invalidates the cached action; the next
+    // poll cycle rebuilds it against the edited config. When the plugin is
+    // disabled we must NOT clear _titleState here: HandlePolling's disabled
+    // branch needs LastSentJson intact to know it still has to clear the title
+    // on Honorific's side.
+    private void CheckConfigRevision()
+    {
+        if (_config.Revision == _lastSeenConfigRevision) return;
+        _lastSeenConfigRevision = _config.Revision;
+
+        if (!_config.Enabled) return;
+
+        _titleState.Clear();
+        _currentTrackId = null;
     }
 
     private void OnFrameworkUpdate(IFramework framework)
@@ -133,6 +159,7 @@ public class Updater : IDisposable
 
         if (HandleAfkStatus()) return;
 
+        CheckConfigRevision();
         ProcessTitleUpdate(deltaSeconds);
         HandlePolling(deltaSeconds);
     }
@@ -177,7 +204,16 @@ public class Updater : IDisposable
     {
         if (_titleState.UpdateAction == null) return;
 
+        // Always advance the template clock so throttling never skews timing,
+        // only how often the output is recomputed.
         _updaterContext.SecsElapsed += deltaSeconds;
+
+        var (shouldRender, newTimer) = CheckRenderDue(
+            _renderTimer, deltaSeconds, _renderInterval,
+            _isTitleTimeDependent, _titleState.LastSentJson != null);
+        _renderTimer = newTimer;
+        if (!shouldRender) return;
+
         try
         {
             _titleState.UpdateAction();
@@ -282,6 +318,11 @@ public class Updater : IDisposable
         }
 
         _updaterContext.SecsElapsed = 0;
+        _isTitleTimeDependent = TemplateHelper.IsTimeDependent(activityConfig);
+        _renderInterval = activityConfig.RainbowMode
+            ? RAINBOW_RENDER_INTERVAL_SECONDS
+            : TEXT_RENDER_INTERVAL_SECONDS;
+        _renderTimer = _renderInterval; // pre-charge: first render lands on the next frame
         _titleState.UpdateAction = CreateTitleUpdateAction(activityConfig, track);
     }
 
@@ -314,6 +355,20 @@ public class Updater : IDisposable
 
         _setCharacterTitleSubscriber.InvokeAction(0, serializedData);
         _titleState.LastSentJson = serializedData;
+    }
+
+    internal static (bool ShouldRender, double NewTimer) CheckRenderDue(
+        double renderTimer, double deltaSeconds, double renderInterval,
+        bool isTimeDependent, bool alreadySent)
+    {
+        if (!isTimeDependent && alreadySent)
+            return (false, renderTimer);
+
+        var newTimer = renderTimer + deltaSeconds;
+        if (newTimer < renderInterval)
+            return (false, newTimer);
+
+        return (true, 0);
     }
 
     internal static (bool ShouldNotify, double NewTimer) CheckAuthNotificationDue(
