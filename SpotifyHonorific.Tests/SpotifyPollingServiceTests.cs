@@ -162,6 +162,33 @@ public class SpotifyPollingServiceTests
     }
 
     [Fact]
+    public void HandleRateLimit_RecordsARateLimitedEvent()
+    {
+        var service = MakeService();
+
+        service.HandleRateLimit(MakeRateLimitException(retryAfterSeconds: 30));
+
+        var events = service.GetEventSnapshot();
+        events.Should().ContainSingle(e => e.Kind == "rateLimited" && e.Detail == "30s");
+    }
+
+    [Fact]
+    public void EventRing_CapsAtOneHundredNewestKept()
+    {
+        var service = MakeService();
+
+        for (var i = 1; i <= 120; i++)
+        {
+            service.HandleRateLimit(MakeRateLimitException(retryAfterSeconds: i));
+        }
+
+        var events = service.GetEventSnapshot();
+        events.Should().HaveCount(100);
+        events[0].Detail.Should().Be("21s");
+        events[^1].Detail.Should().Be("120s");
+    }
+
+    [Fact]
     public void NewService_HasNoRateLimitHistory()
     {
         var service = MakeService();

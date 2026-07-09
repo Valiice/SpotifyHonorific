@@ -204,6 +204,18 @@ public class ConfigWindow : Window
         {
             ImGui.SetClipboardText(_nerdStatsCache);
         }
+
+        ImGui.SameLine();
+        if (ImGui.Button("Copy full report (JSON)##copyNerdReport"))
+        {
+            ImGui.SetClipboardText(Updater.GetDiagnosticReportJson());
+        }
+        ImGui.SameLine();
+        ImGui.TextDisabled("(?)");
+        if (ImGui.IsItemHovered())
+        {
+            ImGui.SetTooltip("Copies a detailed machine-readable report for bug reports.\nIncludes your config and templates but never your Client ID,\nlogin tokens, or other players' character names.");
+        }
     }
 
     private void DrawValidationErrors()

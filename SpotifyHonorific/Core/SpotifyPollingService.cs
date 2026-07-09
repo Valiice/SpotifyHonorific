@@ -31,9 +31,12 @@ public class SpotifyPollingService
     // 400 would wipe the token the winner just saved.
     private readonly SemaphoreSlim _refreshLock = new(1, 1);
 
+    private const int MAX_EVENTS = 100;
+
     private int _apiCallCount;
     private int _apiErrorCount;
     private readonly Queue<long> _apiResponseTimes = new(MAX_RESPONSE_TIME_SAMPLES);
+    private readonly Queue<PollEvent> _events = new(MAX_EVENTS);
 
     public int ApiCallCount => _apiCallCount;
     public int ApiErrorCount => _apiErrorCount;
@@ -85,6 +88,7 @@ public class SpotifyPollingService
             _apiCallCount++;
             RecordResponseTime(stopwatch.ElapsedMilliseconds);
             RecordPollSuccess();
+            RecordEvent("pollOk", $"{stopwatch.ElapsedMilliseconds}ms");
 
             if (currentlyPlaying?.IsPlaying == true && currentlyPlaying.Item is FullTrack track)
             {
@@ -96,6 +100,7 @@ public class SpotifyPollingService
         catch (OperationCanceledException)
         {
             _apiErrorCount++;
+            RecordEvent("timeout");
             HandleError(null, "Spotify API request timed out after 5 seconds.");
             return null;
         }
@@ -108,12 +113,14 @@ public class SpotifyPollingService
         catch (APIException e)
         {
             _apiErrorCount++;
+            RecordEvent("apiError", e.GetType().Name);
             HandleError(e, "Error polling Spotify. Token may be expired.");
             return null;
         }
         catch (Exception e)
         {
             _apiErrorCount++;
+            RecordEvent("apiError", e.GetType().Name);
             HandleError(e, "Unhandled error during Spotify poll");
             return null;
         }
@@ -162,6 +169,7 @@ public class SpotifyPollingService
 
             _currentAccessToken = response.AccessToken;
             TokenRefreshCount++;
+            RecordEvent("tokenRefresh");
 
             _config.WithLock(() =>
             {
@@ -254,10 +262,25 @@ public class SpotifyPollingService
         }
     }
 
+    private void RecordEvent(string kind, string? detail = null)
+    {
+        _events.Enqueue(new PollEvent(DateTime.Now, kind, detail));
+
+        if (_events.Count > MAX_EVENTS)
+        {
+            _events.Dequeue();
+        }
+    }
+
+    internal IReadOnlyList<PollEvent> GetEventSnapshot() => _events.ToList();
+
+    internal IReadOnlyList<long> GetResponseTimeSnapshot() => _apiResponseTimes.ToList();
+
     internal void HandleRateLimit(APITooManyRequestsException e)
     {
         RateLimit429Count++;
         LastRetryAfter = e.RetryAfter;
+        RecordEvent("rateLimited", $"{e.RetryAfter.TotalSeconds:0}s");
 
         var pause = RateLimitGate.Activate(e.RetryAfter, DateTime.Now);
         var message = $"Spotify rate limit hit (429). Pausing polling for {pause.TotalSeconds:0}s.";

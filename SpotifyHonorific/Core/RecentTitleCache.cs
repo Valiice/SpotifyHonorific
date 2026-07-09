@@ -111,4 +111,18 @@ public sealed class RecentTitleCache
 
         return $"{previous.Text} {newest.Text}";
     }
+
+    // Diagnostic report only: which characters we know about and how much
+    // usable data we hold for each, without exposing the sample texts' owners
+    // beyond this process (the report anonymizes the names).
+    internal IReadOnlyList<(string CharacterName, bool KnownListener, int FreshSampleCount)> GetDiagnosticSnapshot(DateTime now)
+    {
+        var names = new HashSet<string>(_samplesByCharacter.Keys);
+        names.UnionWith(_knownSpotifyListeners);
+
+        return names
+            .OrderBy(n => n)
+            .Select(n => (n, _knownSpotifyListeners.Contains(n), GetFreshSamples(n, now).Count))
+            .ToList();
+    }
 }

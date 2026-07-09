@@ -4,9 +4,11 @@ using FluentAssertions;
 using NSubstitute;
 using SpotifyAPI.Web;
 using SpotifyAPI.Web.Http;
+using SpotifyHonorific.Activities;
 using SpotifyHonorific.Core;
 using SpotifyHonorific.Updaters;
 using System.Net;
+using System.Text.Json;
 
 namespace SpotifyHonorific.Tests;
 
@@ -442,6 +444,113 @@ public class UpdaterPerformanceStatsTests
         stats.Should().Contain("429s this session: 1");
         stats.Should().Contain("Rate limited: Yes");
         stats.Should().Contain("Last Retry-After: 90s");
+    }
+
+    private sealed class FakeResponse : IResponse
+    {
+        public object? Body { get; init; }
+        public IReadOnlyDictionary<string, string> Headers { get; init; } = new Dictionary<string, string>();
+        public HttpStatusCode StatusCode { get; init; }
+        public string? ContentType { get; init; }
+    }
+}
+
+public class UpdaterDiagnosticReportTests
+{
+    private static Updater MakeUpdater(out Config config, out SpotifyPollingService pollingService, out NearbyTitleWatcher watcher)
+    {
+        var pluginInterface = Substitute.For<IDalamudPluginInterface>();
+        config = new Config(ActivityConfig.GetDefaults());
+        config.Initialize(pluginInterface);
+        pollingService = new SpotifyPollingService(config, Substitute.For<IPluginLog>(), Substitute.For<IChatGui>());
+        watcher = new NearbyTitleWatcher(
+            Substitute.For<IObjectTable>(),
+            Substitute.For<IHonorificTitleReader>(),
+            new RecentTitleCache());
+
+        return new Updater(
+            Substitute.For<IChatGui>(),
+            config,
+            Substitute.For<IFramework>(),
+            pluginInterface,
+            Substitute.For<IPluginLog>(),
+            Substitute.For<IClientState>(),
+            Substitute.For<IObjectTable>(),
+            new PlaybackState(),
+            Substitute.For<INotificationManager>(),
+            watcher,
+            pollingService);
+    }
+
+    [Fact]
+    public void Report_NeverContainsSecrets()
+    {
+        var updater = MakeUpdater(out var config, out _, out _);
+        config.SpotifyClientId = "SENTINEL_CLIENT_ID_1234";
+        config.SpotifyRefreshToken = "SENTINEL_REFRESH_TOKEN_5678";
+
+        var json = updater.GetDiagnosticReportJson();
+
+        json.Should().NotContain("SENTINEL_CLIENT_ID_1234");
+        json.Should().NotContain("SENTINEL_REFRESH_TOKEN_5678");
+    }
+
+    [Fact]
+    public void Report_IsValidJsonWithExpectedSections()
+    {
+        var updater = MakeUpdater(out _, out _, out _);
+
+        var json = updater.GetDiagnosticReportJson();
+
+        using var doc = JsonDocument.Parse(json);
+        var root = doc.RootElement;
+        foreach (var section in new[] { "meta", "config", "authentication", "api", "rateLimit", "templateCache", "nearby", "music", "player", "events" })
+        {
+            root.TryGetProperty(section, out _).Should().BeTrue($"section '{section}' should exist");
+        }
+        root.GetProperty("config").TryGetProperty("ActivityConfigs", out _).Should().BeTrue();
+    }
+
+    [Fact]
+    public void Report_IncludesRateLimitStateAndEvents()
+    {
+        var updater = MakeUpdater(out _, out var pollingService, out _);
+        pollingService.HandleRateLimit(new APITooManyRequestsException(new FakeResponse
+        {
+            StatusCode = HttpStatusCode.TooManyRequests,
+            Headers = new Dictionary<string, string> { ["Retry-After"] = "90" },
+        }));
+
+        var json = updater.GetDiagnosticReportJson();
+
+        using var doc = JsonDocument.Parse(json);
+        var root = doc.RootElement;
+        root.GetProperty("rateLimit").GetProperty("count429").GetInt32().Should().Be(1);
+        root.GetProperty("rateLimit").GetProperty("lastRetryAfterSeconds").GetDouble().Should().Be(90);
+        root.GetProperty("events").GetArrayLength().Should().BeGreaterThan(0);
+    }
+
+    [Fact]
+    public void BuildNearbySection_AnonymizesNamesConsistently()
+    {
+        var cache = new RecentTitleCache();
+        var now = new DateTime(2026, 7, 9, 12, 0, 0);
+        cache.Record("Aya Brea", "Some Song Title", now);
+        var history = new List<NearbyPlayerEntry>
+        {
+            new() { CharacterName = "Aya Brea", RawTitle = "Some Song Title", LastSeen = now },
+            new() { CharacterName = "Kaine Mana", RawTitle = "Other Song", LastSeen = now },
+        };
+
+        var section = Updater.BuildNearbySection(history, cache, now, watcherEnabled: true);
+        var json = JsonSerializer.Serialize(section);
+
+        json.Should().NotContain("Aya Brea");
+        json.Should().NotContain("Kaine Mana");
+        json.Should().Contain("player1");
+        json.Should().Contain("player2");
+        // Same character maps to the same placeholder in history and cache.
+        System.Text.RegularExpressions.Regex.Matches(json, "player1").Count.Should().Be(2);
     }
 
     private sealed class FakeResponse : IResponse

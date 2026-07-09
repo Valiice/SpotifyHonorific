@@ -26,6 +26,8 @@ public sealed class NearbyTitleWatcher
 
     public IReadOnlyList<NearbyPlayerEntry> History => _history.Entries;
 
+    internal RecentTitleCache RecentTitleCache => _recentTitleCache;
+
     public void Update(double deltaSeconds)
     {
         _timer += deltaSeconds;
