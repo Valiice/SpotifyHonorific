@@ -9,6 +9,9 @@ using SpotifyHonorific.Core;
 using SpotifyHonorific.Utils;
 using System;
 using System.Collections.Generic;
+using System.Linq;
+using System.Text.Json;
+using System.Text.Json.Nodes;
 using System.Threading.Tasks;
 
 namespace SpotifyHonorific.Updaters;
@@ -58,6 +61,9 @@ public class Updater : IDisposable
     private readonly HashSet<string> _tracksPlayedToday = new(100);
     private readonly DateTime _sessionStartTime;
 
+    private static readonly string PluginVersion =
+        typeof(Updater).Assembly.GetName().Version?.ToString(3) ?? "unknown";
+
     public Updater(IChatGui chatGui, Config config, IFramework framework, IDalamudPluginInterface pluginInterface, IPluginLog pluginLog, IClientState clientState, IObjectTable objectTable, PlaybackState playbackState, INotificationManager notificationManager, NearbyTitleWatcher nearbyTitleWatcher, SpotifyPollingService spotifyPollingService)
     {
         _chatGui = chatGui;
@@ -85,16 +91,34 @@ public class Updater : IDisposable
 
     public string GetPerformanceStats()
     {
-        var sessionDuration = DateTime.Now - _sessionStartTime;
+        var now = DateTime.Now;
+        var sessionDuration = now - _sessionStartTime;
+        var requestsPerMinute = (_pollingService.ApiCallCount + _pollingService.ApiErrorCount)
+            / Math.Max(sessionDuration.TotalMinutes, 1.0 / 60.0);
+        var rateLimitRemaining = _pollingService.RateLimitGate.Remaining(now);
+        var rateLimitedText = rateLimitRemaining > TimeSpan.Zero
+            ? $"Yes ({rateLimitRemaining.TotalSeconds:0}s remaining)"
+            : "No";
+        var lastRetryAfterText = _pollingService.LastRetryAfter is { } retryAfter
+            ? $"{retryAfter.TotalSeconds:0}s"
+            : "never";
 
         return $"""
             === SpotifyHonorific Performance Stats ===
+            Plugin version: {PluginVersion}
             Session Duration: {sessionDuration:hh\:mm\:ss}
 
             API Statistics:
             • Total API calls: {_pollingService.ApiCallCount}
             • API errors: {_pollingService.ApiErrorCount}
+            • Requests per minute: {requestsPerMinute:F1}
             • Average response time: {_pollingService.AverageResponseTime:F0}ms
+            • Token refreshes: {_pollingService.TokenRefreshCount}
+
+            Rate Limiting:
+            • 429s this session: {_pollingService.RateLimit429Count}
+            • Rate limited: {rateLimitedText}
+            • Last Retry-After: {lastRetryAfterText}
 
             Template Cache:
             • Cache hits: {_templateCache.CacheHits}
@@ -107,6 +131,127 @@ public class Updater : IDisposable
             • Currently playing: {(_isMusicPlaying ? "Yes" : "No")}
             • Player AFK: {(IsPlayerAfk ? "Yes" : "No")}
             """;
+    }
+
+    private static readonly JsonSerializerOptions ReportJsonOptions = new()
+    {
+        WriteIndented = true,
+        // ActivityConfig colors are Vector4: its components are public FIELDS,
+        // which System.Text.Json skips by default.
+        IncludeFields = true,
+    };
+
+    public string GetDiagnosticReportJson()
+    {
+        var now = DateTime.Now;
+        var sessionDuration = now - _sessionStartTime;
+
+        var (authenticated, clientIdConfigured, lastAuthTime, configNode) = _config.WithLock(() =>
+        {
+            var node = JsonSerializer.SerializeToNode(_config, ReportJsonOptions)!.AsObject();
+            // Secrets denylist: see the comment on these properties in Config.cs.
+            node.Remove("SpotifyClientId");
+            node.Remove("SpotifyRefreshToken");
+            return (!_config.SpotifyRefreshToken.IsNullOrWhitespace(),
+                    !_config.SpotifyClientId.IsNullOrWhitespace(),
+                    _config.LastSpotifyAuthTime,
+                    node);
+        });
+
+        var gate = _pollingService.RateLimitGate;
+        var track = _playbackState.CurrentTrack;
+
+        var report = new
+        {
+            meta = new
+            {
+                generatedAtLocal = now,
+                generatedAtUtc = DateTime.UtcNow,
+                pluginVersion = PluginVersion,
+                dotnetRuntimeVersion = Environment.Version.ToString(),
+                sessionStart = _sessionStartTime,
+                sessionDurationSeconds = sessionDuration.TotalSeconds,
+            },
+            config = configNode,
+            authentication = new
+            {
+                authenticated,
+                clientIdConfigured,
+                lastAuthTime,
+                tokenAgeMinutes = (now - lastAuthTime).TotalMinutes,
+            },
+            api = new
+            {
+                totalCalls = _pollingService.ApiCallCount,
+                errorCount = _pollingService.ApiErrorCount,
+                requestsPerMinute = (_pollingService.ApiCallCount + _pollingService.ApiErrorCount)
+                    / Math.Max(sessionDuration.TotalMinutes, 1.0 / 60.0),
+                averageResponseMs = _pollingService.AverageResponseTime,
+                tokenRefreshCount = _pollingService.TokenRefreshCount,
+                responseTimesMs = _pollingService.GetResponseTimeSnapshot(),
+            },
+            rateLimit = new
+            {
+                count429 = _pollingService.RateLimit429Count,
+                lastRetryAfterSeconds = _pollingService.LastRetryAfter?.TotalSeconds,
+                gateActive = gate.IsActive(now),
+                gateRemainingSeconds = gate.Remaining(now).TotalSeconds,
+                fallbackEscalationCount = gate.FallbackEscalationCount,
+            },
+            templateCache = new
+            {
+                hits = _templateCache.CacheHits,
+                misses = _templateCache.CacheMisses,
+                hitRatePercent = _templateCache.HitRate,
+                cachedTemplateCount = _templateCache.CachedTemplateCount,
+            },
+            nearby = BuildNearbySection(_nearbyTitleWatcher.History, _nearbyTitleWatcher.RecentTitleCache, now, _config.Enabled),
+            music = new
+            {
+                currentlyPlaying = _isMusicPlaying,
+                uniqueTracksToday = _tracksPlayedToday.Count,
+                currentTrackName = track?.Name,
+                currentTrackArtists = track?.Artists.Select(a => a.Name).ToList(),
+            },
+            player = new
+            {
+                isAfk = IsPlayerAfk,
+                isLoggedIn = _clientState.IsLoggedIn,
+            },
+            events = _pollingService.GetEventSnapshot(),
+        };
+
+        return JsonSerializer.Serialize(report, ReportJsonOptions);
+    }
+
+    // Character names must never leave the machine: each distinct character
+    // becomes a stable per-report placeholder so history and cache entries can
+    // still be correlated. Honorific title text (song/artist) is fine to keep.
+    internal static object BuildNearbySection(IReadOnlyList<NearbyPlayerEntry> history, RecentTitleCache cache, DateTime now, bool watcherEnabled)
+    {
+        var placeholders = new Dictionary<string, string>();
+
+        string Anon(string name)
+        {
+            if (!placeholders.TryGetValue(name, out var alias))
+            {
+                alias = $"player{placeholders.Count + 1}";
+                placeholders[name] = alias;
+            }
+            return alias;
+        }
+
+        return new
+        {
+            watcherEnabled,
+            historyCount = history.Count,
+            history = history
+                .Select(e => new { player = Anon(e.CharacterName), title = e.RawTitle, lastSeen = e.LastSeen })
+                .ToList(),
+            titleCache = cache.GetDiagnosticSnapshot(now)
+                .Select(s => new { player = Anon(s.CharacterName), knownSpotifyListener = s.KnownListener, freshSampleCount = s.FreshSampleCount })
+                .ToList(),
+        };
     }
 
     public void Dispose()

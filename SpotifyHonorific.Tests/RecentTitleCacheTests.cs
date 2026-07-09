@@ -180,4 +180,18 @@ public class RecentTitleCacheTests
 
         cache.IsKnownSpotifyListener("Maki Shimada").Should().BeFalse();
     }
+
+    [Fact]
+    public void GetDiagnosticSnapshot_CoversSampledAndListenerOnlyCharacters()
+    {
+        var cache = new RecentTitleCache();
+        cache.Record("Aya Brea", "Some Song Title", BaseTime);
+        cache.Record("Kaine Mana", "Listening to Spotify", BaseTime); // placeholder: listener only
+
+        var snapshot = cache.GetDiagnosticSnapshot(BaseTime);
+
+        snapshot.Should().HaveCount(2);
+        snapshot.Should().Contain(s => s.CharacterName == "Aya Brea" && !s.KnownListener && s.FreshSampleCount == 1);
+        snapshot.Should().Contain(s => s.CharacterName == "Kaine Mana" && s.KnownListener && s.FreshSampleCount == 0);
+    }
 }

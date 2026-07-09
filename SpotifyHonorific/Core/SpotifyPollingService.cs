@@ -31,13 +31,20 @@ public class SpotifyPollingService
     // 400 would wipe the token the winner just saved.
     private readonly SemaphoreSlim _refreshLock = new(1, 1);
 
+    private const int MAX_EVENTS = 100;
+
     private int _apiCallCount;
     private int _apiErrorCount;
     private readonly Queue<long> _apiResponseTimes = new(MAX_RESPONSE_TIME_SAMPLES);
+    private readonly Queue<PollEvent> _events = new(MAX_EVENTS);
 
     public int ApiCallCount => _apiCallCount;
     public int ApiErrorCount => _apiErrorCount;
     public double AverageResponseTime => _apiResponseTimes.Count > 0 ? _apiResponseTimes.Average() : 0;
+
+    public int RateLimit429Count { get; private set; }
+    public TimeSpan? LastRetryAfter { get; private set; }
+    public int TokenRefreshCount { get; private set; }
 
     internal RateLimitGate RateLimitGate { get; } = new();
 
@@ -81,6 +88,7 @@ public class SpotifyPollingService
             _apiCallCount++;
             RecordResponseTime(stopwatch.ElapsedMilliseconds);
             RecordPollSuccess();
+            RecordEvent("pollOk", $"{stopwatch.ElapsedMilliseconds}ms");
 
             if (currentlyPlaying?.IsPlaying == true && currentlyPlaying.Item is FullTrack track)
             {
@@ -92,6 +100,7 @@ public class SpotifyPollingService
         catch (OperationCanceledException)
         {
             _apiErrorCount++;
+            RecordEvent("timeout");
             HandleError(null, "Spotify API request timed out after 5 seconds.");
             return null;
         }
@@ -104,12 +113,14 @@ public class SpotifyPollingService
         catch (APIException e)
         {
             _apiErrorCount++;
+            RecordEvent("apiError", e.GetType().Name);
             HandleError(e, "Error polling Spotify. Token may be expired.");
             return null;
         }
         catch (Exception e)
         {
             _apiErrorCount++;
+            RecordEvent("apiError", e.GetType().Name);
             HandleError(e, "Unhandled error during Spotify poll");
             return null;
         }
@@ -157,6 +168,8 @@ public class SpotifyPollingService
             ).ConfigureAwait(false);
 
             _currentAccessToken = response.AccessToken;
+            TokenRefreshCount++;
+            RecordEvent("tokenRefresh");
 
             _config.WithLock(() =>
             {
@@ -249,8 +262,26 @@ public class SpotifyPollingService
         }
     }
 
+    private void RecordEvent(string kind, string? detail = null)
+    {
+        _events.Enqueue(new PollEvent(DateTime.Now, kind, detail));
+
+        if (_events.Count > MAX_EVENTS)
+        {
+            _events.Dequeue();
+        }
+    }
+
+    internal IReadOnlyList<PollEvent> GetEventSnapshot() => _events.ToList();
+
+    internal IReadOnlyList<long> GetResponseTimeSnapshot() => _apiResponseTimes.ToList();
+
     internal void HandleRateLimit(APITooManyRequestsException e)
     {
+        RateLimit429Count++;
+        LastRetryAfter = e.RetryAfter;
+        RecordEvent("rateLimited", $"{e.RetryAfter.TotalSeconds:0}s");
+
         var pause = RateLimitGate.Activate(e.RetryAfter, DateTime.Now);
         var message = $"Spotify rate limit hit (429). Pausing polling for {pause.TotalSeconds:0}s.";
 
@@ -261,7 +292,10 @@ public class SpotifyPollingService
         if (!_rateLimitAnnounced)
         {
             _rateLimitAnnounced = true;
-            _chatGui.PrintError("SpotifyHonorific: Spotify is rate limiting requests. Polling is paused and will resume automatically once the limit clears.");
+            _chatGui.PrintError(
+                "SpotifyHonorific: Spotify is rate limiting this app's requests. " +
+                "This is a Spotify-side limit on your Spotify application, often after very long continuous listening. " +
+                $"It is not a plugin error. Polling is paused for about {FormatPause(pause)} and will resume automatically.");
         }
         else if (_config.EnableDebugLogging)
         {
@@ -271,7 +305,23 @@ public class SpotifyPollingService
         // The token is fine; keep the client so no refresh traffic is added.
     }
 
-    internal void RecordPollSuccess() => _rateLimitAnnounced = false;
+    internal void RecordPollSuccess()
+    {
+        if (!_rateLimitAnnounced) return;
+
+        // First successful poll after an announced episode: close the loop in
+        // chat and let the fallback escalation start from scratch next time.
+        _rateLimitAnnounced = false;
+        RateLimitGate.ResetEscalation();
+        _chatGui.Print("SpotifyHonorific: Spotify rate limit cleared, polling resumed.");
+    }
+
+    internal static string FormatPause(TimeSpan pause)
+    {
+        if (pause < TimeSpan.FromSeconds(90)) return $"{pause.TotalSeconds:0}s";
+        if (pause < TimeSpan.FromMinutes(90)) return $"{pause.TotalMinutes:0}m";
+        return $"{(int)pause.TotalHours}h {pause.Minutes}m";
+    }
 
     private void HandleError(Exception? e, string message)
     {

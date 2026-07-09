@@ -42,6 +42,8 @@ public class ConfigWindow : Window
     private float _kofiButtonWidth;
     private bool _confirmDeleteAll;
     private bool _authInProgress;
+    private string _nerdStatsCache = string.Empty;
+    private DateTime _nerdStatsBuiltAt = DateTime.MinValue;
 
     private static readonly string RecreateText = "Recreate Defaults";
     private static readonly System.Reflection.PropertyInfo[] UpdaterContextProperties = typeof(UpdaterContext).GetProperties();
@@ -174,6 +176,46 @@ public class ConfigWindow : Window
         }
         if (ImGui.IsItemHovered())
             ImGui.SetTooltip("Tick this if you support Honorific on Ko-fi.\nUnlocks gradient glow styles (supporter-only feature in Honorific).");
+
+        ImGui.Spacing();
+        DrawNerdStats();
+    }
+
+    private void DrawNerdStats()
+    {
+        if (!ImGui.CollapsingHeader("Nerd Stats##nerdStats")) return;
+
+        var now = DateTime.Now;
+        if ((now - _nerdStatsBuiltAt).TotalSeconds >= 1)
+        {
+            _nerdStatsCache = Updater.GetPerformanceStats();
+            _nerdStatsBuiltAt = now;
+        }
+
+        var remaining = SpotifyPollingService.RateLimitGate.Remaining(now);
+        if (remaining > TimeSpan.Zero)
+        {
+            ImGui.TextColored(ImGuiColors.DalamudOrange, $"Rate limited, polling resumes in {remaining.TotalSeconds:0}s");
+        }
+
+        ImGui.TextUnformatted(_nerdStatsCache);
+
+        if (ImGui.Button("Copy stats##copyNerdStats"))
+        {
+            ImGui.SetClipboardText(_nerdStatsCache);
+        }
+
+        ImGui.SameLine();
+        if (ImGui.Button("Copy full report (JSON)##copyNerdReport"))
+        {
+            ImGui.SetClipboardText(Updater.GetDiagnosticReportJson());
+        }
+        ImGui.SameLine();
+        ImGui.TextDisabled("(?)");
+        if (ImGui.IsItemHovered())
+        {
+            ImGui.SetTooltip("Copies a detailed machine-readable report for bug reports.\nIncludes your config and templates but never your Client ID,\nlogin tokens, or other players' character names.");
+        }
     }
 
     private void DrawValidationErrors()

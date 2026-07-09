@@ -27,6 +27,10 @@ public class Config : IPluginConfiguration
     [JsonIgnore]
     public int Revision { get; private set; }
 
+    // SpotifyClientId and SpotifyRefreshToken are secrets: they are persisted
+    // in the Dalamud config file but MUST stay out of the diagnostic report.
+    // Updater.GetDiagnosticReportJson removes them by property name; any new
+    // secret added to this class must be added to that denylist too.
     public string SpotifyClientId { get; set; } = string.Empty;
     public string SpotifyRefreshToken { get; set; } = string.Empty;
     public DateTime LastSpotifyAuthTime { get; set; } = DateTime.MinValue;
