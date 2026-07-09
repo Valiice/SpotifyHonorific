@@ -39,6 +39,10 @@ public class Config : IPluginConfiguration
     public bool EnableNotifications { get; set; } = true;
     public bool IsHonorificSupporter { get; set; }
 
+    // Auto-enabled by SpotifyPollingService the first time Spotify returns a
+    // 429; polls less often to keep the user under Spotify's limits.
+    public bool RateLimitProtection { get; set; }
+
     public string ActiveConfigName { get; set; } = string.Empty;
     public List<ActivityConfig> ActivityConfigs { get; set; } = [];
 

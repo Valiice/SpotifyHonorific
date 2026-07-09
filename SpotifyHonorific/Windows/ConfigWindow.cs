@@ -178,6 +178,20 @@ public class ConfigWindow : Window
             ImGui.SetTooltip("Tick this if you support Honorific on Ko-fi.\nUnlocks gradient glow styles (supporter-only feature in Honorific).");
 
         ImGui.Spacing();
+        var rateLimitProtection = Config.RateLimitProtection;
+        if (ImGui.Checkbox("Rate limit protection##rateLimitProtection", ref rateLimitProtection))
+        {
+            Config.RateLimitProtection = rateLimitProtection;
+            Config.Save();
+        }
+        ImGui.SameLine();
+        ImGui.TextDisabled("(?)");
+        if (ImGui.IsItemHovered())
+        {
+            ImGui.SetTooltip("Checks Spotify less often to avoid Spotify's rate limits.\nTitle updates may lag a few seconds behind track changes.\nTurns itself on automatically if Spotify rate limits you.\nRecommended if you listen to music all day.");
+        }
+
+        ImGui.Spacing();
         DrawNerdStats();
     }
 

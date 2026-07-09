@@ -375,6 +375,24 @@ public class RenderThrottleTests
         Updater.TEXT_RENDER_INTERVAL_SECONDS.Should().Be(0.5);
         Updater.RAINBOW_RENDER_INTERVAL_SECONDS.Should().Be(0.1);
     }
+
+    [Theory]
+    [InlineData(false, true, 60_000, 200_000, 2.0)]   // protection off: always 2s
+    [InlineData(false, false, null, null, 2.0)]
+    [InlineData(true, false, null, null, 15.0)]       // nothing playing or paused
+    [InlineData(true, true, 5_000, 200_000, 5.0)]     // first 30s of track
+    [InlineData(true, true, 0, 200_000, 5.0)]         // boundary: track just started
+    [InlineData(true, true, 100_000, 200_000, 10.0)]  // mid-track
+    [InlineData(true, true, 30_000, 200_000, 10.0)]   // boundary: exactly 30s in
+    [InlineData(true, true, 185_000, 200_000, 5.0)]   // last 20s of track
+    [InlineData(true, true, 180_000, 200_000, 5.0)]   // boundary: exactly 20s left
+    [InlineData(true, true, null, 200_000, 5.0)]      // missing progress: safe fallback
+    [InlineData(true, true, 60_000, null, 5.0)]       // missing duration: safe fallback
+    [InlineData(true, true, 60_000, 0, 5.0)]          // zero duration: safe fallback
+    public void ComputeNextPollInterval_MatchesSpec(bool protectionOn, bool hasTrack, int? progressMs, int? durationMs, double expected)
+    {
+        Updater.ComputeNextPollInterval(protectionOn, hasTrack, progressMs, durationMs).Should().Be(expected);
+    }
 }
 
 public class UpdaterPerformanceStatsTests
@@ -386,10 +404,10 @@ public class UpdaterPerformanceStatsTests
         return new SpotifyPollingService(config, Substitute.For<IPluginLog>(), Substitute.For<IChatGui>());
     }
 
-    private static Updater MakeUpdater(SpotifyPollingService pollingService)
+    private static Updater MakeUpdater(SpotifyPollingService pollingService, out Config config)
     {
         var pluginInterface = Substitute.For<IDalamudPluginInterface>();
-        var config = new Config();
+        config = new Config();
         config.Initialize(pluginInterface);
         var nearbyWatcher = new NearbyTitleWatcher(
             Substitute.For<IObjectTable>(),
@@ -420,7 +438,7 @@ public class UpdaterPerformanceStatsTests
     [Fact]
     public void GetPerformanceStats_NeverRateLimited_ShowsZeroesAndPlaceholders()
     {
-        var updater = MakeUpdater(MakePollingService());
+        var updater = MakeUpdater(MakePollingService(), out _);
 
         var stats = updater.GetPerformanceStats();
 
@@ -437,13 +455,31 @@ public class UpdaterPerformanceStatsTests
     {
         var pollingService = MakePollingService();
         pollingService.HandleRateLimit(MakeRateLimitException(retryAfterSeconds: 90));
-        var updater = MakeUpdater(pollingService);
+        var updater = MakeUpdater(pollingService, out _);
 
         var stats = updater.GetPerformanceStats();
 
         stats.Should().Contain("429s this session: 1");
         stats.Should().Contain("Rate limited: Yes");
         stats.Should().Contain("Last Retry-After: 90s");
+    }
+
+    [Fact]
+    public void GetPerformanceStats_ProtectionOff_SaysOff()
+    {
+        var updater = MakeUpdater(MakePollingService(), out _);
+
+        updater.GetPerformanceStats().Should().Contain("Rate limit protection: Off");
+    }
+
+    [Fact]
+    public void GetPerformanceStats_ProtectionOn_ShowsCurrentInterval()
+    {
+        var updater = MakeUpdater(MakePollingService(), out var config);
+        config.RateLimitProtection = true;
+
+        // No poll has happened yet, so the interval is still the 2s default.
+        updater.GetPerformanceStats().Should().Contain("Rate limit protection: On (current interval: 2s)");
     }
 
     private sealed class FakeResponse : IResponse
@@ -528,6 +564,20 @@ public class UpdaterDiagnosticReportTests
         root.GetProperty("rateLimit").GetProperty("count429").GetInt32().Should().Be(1);
         root.GetProperty("rateLimit").GetProperty("lastRetryAfterSeconds").GetDouble().Should().Be(90);
         root.GetProperty("events").GetArrayLength().Should().BeGreaterThan(0);
+    }
+
+    [Fact]
+    public void Report_IncludesRateLimitProtectionState()
+    {
+        var updater = MakeUpdater(out var config, out _, out _);
+        config.RateLimitProtection = true;
+
+        var json = updater.GetDiagnosticReportJson();
+
+        using var doc = JsonDocument.Parse(json);
+        var rateLimit = doc.RootElement.GetProperty("rateLimit");
+        rateLimit.GetProperty("protectionEnabled").GetBoolean().Should().BeTrue();
+        rateLimit.GetProperty("currentPollIntervalSeconds").GetDouble().Should().Be(2.0);
     }
 
     [Fact]

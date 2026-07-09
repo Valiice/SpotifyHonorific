@@ -19,6 +19,11 @@ namespace SpotifyHonorific.Updaters;
 public class Updater : IDisposable
 {
     private const double POLLING_INTERVAL_SECONDS = 2.0;
+    internal const double PROTECTED_EDGE_POLL_SECONDS = 5.0;
+    internal const double PROTECTED_MID_POLL_SECONDS = 10.0;
+    internal const double PROTECTED_IDLE_POLL_SECONDS = 15.0;
+    internal const int TRACK_START_WINDOW_MS = 30_000;
+    internal const int TRACK_END_WINDOW_MS = 20_000;
     private const double AUTH_NOTIFICATION_COOLDOWN_SECONDS = 600.0;
     private const uint AFK_ONLINE_STATUS_ID = 17;
     private const double AFK_MUSIC_GRACE_SECONDS = 10.0;
@@ -47,6 +52,8 @@ public class Updater : IDisposable
     private readonly NearbyTitleWatcher _nearbyTitleWatcher;
 
     private double _pollingTimer;
+    private double _currentPollIntervalSeconds = POLLING_INTERVAL_SECONDS;
+
     private bool _isPolling;
     private bool _isMusicPlaying;
     private string? _currentTrackId;
@@ -102,6 +109,9 @@ public class Updater : IDisposable
         var lastRetryAfterText = _pollingService.LastRetryAfter is { } retryAfter
             ? $"{retryAfter.TotalSeconds:0}s"
             : "never";
+        var protectionText = _config.RateLimitProtection
+            ? $"On (current interval: {_currentPollIntervalSeconds:0}s)"
+            : "Off";
 
         return $"""
             === SpotifyHonorific Performance Stats ===
@@ -119,6 +129,7 @@ public class Updater : IDisposable
             • 429s this session: {_pollingService.RateLimit429Count}
             • Rate limited: {rateLimitedText}
             • Last Retry-After: {lastRetryAfterText}
+            • Rate limit protection: {protectionText}
 
             Template Cache:
             • Cache hits: {_templateCache.CacheHits}
@@ -197,6 +208,8 @@ public class Updater : IDisposable
                 gateActive = gate.IsActive(now),
                 gateRemainingSeconds = gate.Remaining(now).TotalSeconds,
                 fallbackEscalationCount = gate.FallbackEscalationCount,
+                protectionEnabled = _config.RateLimitProtection,
+                currentPollIntervalSeconds = _currentPollIntervalSeconds,
             },
             templateCache = new
             {
@@ -393,14 +406,14 @@ public class Updater : IDisposable
 
         _authNotificationTimer = 0;
 
-        if (_pollingTimer < POLLING_INTERVAL_SECONDS || _isPolling)
+        if (_pollingTimer < _currentPollIntervalSeconds || _isPolling)
         {
             return;
         }
 
         if (_config.EnableDebugLogging)
         {
-            _pluginLog.Debug($"POLLING NOW. Timer: {_pollingTimer:F2}/{POLLING_INTERVAL_SECONDS}s | IsPlaying: {_isMusicPlaying}");
+            _pluginLog.Debug($"POLLING NOW. Timer: {_pollingTimer:F2}/{_currentPollIntervalSeconds:F0}s | IsPlaying: {_isMusicPlaying}");
         }
 
         _pollingTimer = 0.0;
@@ -414,8 +427,8 @@ public class Updater : IDisposable
 
         try
         {
-            var track = await _pollingService.GetCurrentlyPlayingTrackAsync().ConfigureAwait(false);
-            await _framework.RunOnFrameworkThread(() => ProcessPollResult(track)).ConfigureAwait(false);
+            var result = await _pollingService.GetCurrentlyPlayingTrackAsync().ConfigureAwait(false);
+            await _framework.RunOnFrameworkThread(() => ProcessPollResult(result)).ConfigureAwait(false);
         }
         finally
         {
@@ -423,9 +436,13 @@ public class Updater : IDisposable
         }
     }
 
-    private void ProcessPollResult(FullTrack? track)
+    private void ProcessPollResult(SpotifyPollResult? result)
     {
+        var track = result?.Track;
         _playbackState.CurrentTrack = track;
+
+        _currentPollIntervalSeconds = ComputeNextPollInterval(
+            _config.RateLimitProtection, track != null, result?.ProgressMs, track?.DurationMs);
 
         if (track != null)
         {
@@ -439,6 +456,20 @@ public class Updater : IDisposable
             _currentTrackId = null;
             ClearTitle();
         }
+    }
+
+    // Rate limit protection trades title responsiveness for fewer API
+    // requests: quick polls near a track's start (catches skips) and end
+    // (catches the transition), relaxed polls mid-track and while idle.
+    // Failed or gate-skipped polls also land in the idle interval on purpose.
+    internal static double ComputeNextPollInterval(bool protectionOn, bool hasTrack, int? progressMs, int? durationMs)
+    {
+        if (!protectionOn) return POLLING_INTERVAL_SECONDS;
+        if (!hasTrack) return PROTECTED_IDLE_POLL_SECONDS;
+        if (progressMs == null || durationMs is null or <= 0) return PROTECTED_EDGE_POLL_SECONDS;
+        if (progressMs < TRACK_START_WINDOW_MS) return PROTECTED_EDGE_POLL_SECONDS;
+        if (durationMs - progressMs <= TRACK_END_WINDOW_MS) return PROTECTED_EDGE_POLL_SECONDS;
+        return PROTECTED_MID_POLL_SECONDS;
     }
 
     internal static bool ShouldSkipTrackProcessing(string? currentTrackId, string newTrackId, Action? updateTitle)
