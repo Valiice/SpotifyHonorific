@@ -40,17 +40,77 @@ public class RateLimitGateTests
     }
 
     [Fact]
-    public void Activate_ExcessiveRetryAfter_IsCappedSoPollingEventuallyResumes()
+    public void Activate_LongRetryAfter_IsHonoredInFull()
     {
-        // Retry-After can be hours on badly rate-limited apps; cap it so the
-        // plugin re-checks within a reasonable time instead of going silent.
+        // Spotify tells us exactly when to come back; probing earlier is a
+        // guaranteed 429 that can extend the penalty.
         var gate = new RateLimitGate();
 
         var pause = gate.Activate(TimeSpan.FromHours(6), Now);
 
-        pause.Should().Be(TimeSpan.FromMinutes(15));
-        gate.IsActive(Now.AddMinutes(14)).Should().BeTrue();
-        gate.IsActive(Now.AddMinutes(16)).Should().BeFalse();
+        pause.Should().Be(TimeSpan.FromHours(6));
+        gate.IsActive(Now.AddHours(5)).Should().BeTrue();
+        gate.IsActive(Now.AddHours(7)).Should().BeFalse();
+    }
+
+    [Fact]
+    public void Activate_AbsurdRetryAfter_IsSanityCappedAt24Hours()
+    {
+        var gate = new RateLimitGate();
+
+        var pause = gate.Activate(TimeSpan.FromHours(48), Now);
+
+        pause.Should().Be(TimeSpan.FromHours(24));
+    }
+
+    [Fact]
+    public void Activate_ConsecutiveFallbacks_DoubleFrom30Seconds()
+    {
+        // No Retry-After header: 30s matches Spotify's rolling window, and
+        // repeated header-less 429s must back off instead of probing forever.
+        var gate = new RateLimitGate();
+
+        gate.Activate(TimeSpan.Zero, Now).Should().Be(TimeSpan.FromSeconds(30));
+        gate.Activate(TimeSpan.Zero, Now).Should().Be(TimeSpan.FromMinutes(1));
+        gate.Activate(TimeSpan.Zero, Now).Should().Be(TimeSpan.FromMinutes(2));
+    }
+
+    [Fact]
+    public void Activate_ManyConsecutiveFallbacks_CapAtOneHour()
+    {
+        var gate = new RateLimitGate();
+
+        for (var i = 0; i < 12; i++)
+        {
+            gate.Activate(TimeSpan.Zero, Now);
+        }
+
+        gate.Activate(TimeSpan.Zero, Now).Should().Be(TimeSpan.FromHours(1));
+    }
+
+    [Fact]
+    public void ResetEscalation_ReturnsFallbackToBase()
+    {
+        var gate = new RateLimitGate();
+        gate.Activate(TimeSpan.Zero, Now);
+        gate.Activate(TimeSpan.Zero, Now);
+
+        gate.ResetEscalation();
+
+        gate.FallbackEscalationCount.Should().Be(0);
+        gate.Activate(TimeSpan.Zero, Now).Should().Be(TimeSpan.FromSeconds(30));
+    }
+
+    [Fact]
+    public void Activate_ExplicitRetryAfter_DoesNotAdvanceFallbackEscalation()
+    {
+        var gate = new RateLimitGate();
+        gate.Activate(TimeSpan.Zero, Now);
+
+        gate.Activate(TimeSpan.FromSeconds(45), Now);
+
+        gate.FallbackEscalationCount.Should().Be(1);
+        gate.Activate(TimeSpan.Zero, Now).Should().Be(TimeSpan.FromMinutes(1));
     }
 
     [Fact]

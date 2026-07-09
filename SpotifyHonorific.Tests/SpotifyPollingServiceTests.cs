@@ -100,6 +100,68 @@ public class SpotifyPollingServiceTests
     }
 
     [Fact]
+    public void HandleRateLimit_ExplainsTheLimitAndDuration()
+    {
+        var chatGui = Substitute.For<IChatGui>();
+        var service = MakeService(chatGui: chatGui);
+
+        service.HandleRateLimit(MakeRateLimitException(retryAfterSeconds: 30));
+
+        chatGui.Received(1).PrintError(
+            Arg.Is<string>(s => s.Contains("Spotify-side limit") && s.Contains("30s")),
+            Arg.Any<string?>(), Arg.Any<ushort?>());
+    }
+
+    [Fact]
+    public void RecordPollSuccess_AfterAnnouncedEpisode_AnnouncesResumeOnce()
+    {
+        var chatGui = Substitute.For<IChatGui>();
+        var service = MakeService(chatGui: chatGui);
+
+        service.HandleRateLimit(MakeRateLimitException(retryAfterSeconds: 30));
+        service.RecordPollSuccess();
+        service.RecordPollSuccess();
+
+        chatGui.Received(1).Print(
+            Arg.Is<string>(s => s.Contains("polling resumed")),
+            Arg.Any<string?>(), Arg.Any<ushort?>());
+    }
+
+    [Fact]
+    public void RecordPollSuccess_WithoutEpisode_PrintsNothing()
+    {
+        var chatGui = Substitute.For<IChatGui>();
+        var service = MakeService(chatGui: chatGui);
+
+        service.RecordPollSuccess();
+
+        chatGui.DidNotReceive().Print(Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<ushort?>());
+    }
+
+    [Fact]
+    public void RecordPollSuccess_AfterEpisode_ResetsGateEscalation()
+    {
+        var service = MakeService();
+        service.RateLimitGate.Activate(TimeSpan.Zero, DateTime.Now);
+        service.HandleRateLimit(MakeRateLimitException(retryAfterSeconds: 30));
+
+        service.RecordPollSuccess();
+
+        service.RateLimitGate.FallbackEscalationCount.Should().Be(0);
+    }
+
+    [Theory]
+    [InlineData(30, "30s")]
+    [InlineData(89, "89s")]
+    [InlineData(90, "2m")]
+    [InlineData(2700, "45m")]
+    [InlineData(9000, "2h 30m")]
+    public void FormatPause_FormatsHumanReadably(int seconds, string expected)
+    {
+        SpotifyPollingService.FormatPause(TimeSpan.FromSeconds(seconds)).Should().Be(expected);
+    }
+
+    [Fact]
     public void NewService_HasNoRateLimitHistory()
     {
         var service = MakeService();
