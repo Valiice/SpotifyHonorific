@@ -48,6 +48,16 @@ This is a **FFXIV Dalamud plugin** that updates a character's honorific title ba
 
 Follow **SoC** (Separation of Concerns), **KISS** (Keep It Simple), and **DRY** (Don't Repeat Yourself). Extract focused methods per concern, avoid unnecessary abstractions, and keep solutions minimal. Prioritize readability — use clear, descriptive method and variable names, and break logic into well-named methods.
 
+## Commits & Releases
+
+Commit messages appear in the public changelog draft and release notes, so keep history clean:
+
+- Single-line, imperative, user-readable commit messages (they double as changelog lines).
+- Squash work into feature-sized commits: one commit per feature or meaningful unit, not one per TDD step, fix-up, or review round.
+- Version bumps get their own commit ("Bump version to X.Y.Z") on the feature branch before merging.
+- Merge feature branches into master with a merge commit (`git merge --no-ff`).
+- After each release, clean up the repo.json changelog and release notes before they go public.
+
 ## Tech Stack
 
 - C# / .NET 10.0 (Windows, x64)
