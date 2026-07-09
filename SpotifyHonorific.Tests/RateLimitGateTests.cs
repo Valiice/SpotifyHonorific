@@ -62,4 +62,30 @@ public class RateLimitGateTests
 
         pause.Should().Be(TimeSpan.FromSeconds(90));
     }
+
+    [Fact]
+    public void Remaining_NewGate_IsZero()
+    {
+        var gate = new RateLimitGate();
+
+        gate.Remaining(Now).Should().Be(TimeSpan.Zero);
+    }
+
+    [Fact]
+    public void Remaining_WhileActive_ReturnsTimeLeft()
+    {
+        var gate = new RateLimitGate();
+        gate.Activate(TimeSpan.FromSeconds(30), Now);
+
+        gate.Remaining(Now.AddSeconds(10)).Should().Be(TimeSpan.FromSeconds(20));
+    }
+
+    [Fact]
+    public void Remaining_AfterExpiry_IsZero()
+    {
+        var gate = new RateLimitGate();
+        gate.Activate(TimeSpan.FromSeconds(30), Now);
+
+        gate.Remaining(Now.AddSeconds(31)).Should().Be(TimeSpan.Zero);
+    }
 }

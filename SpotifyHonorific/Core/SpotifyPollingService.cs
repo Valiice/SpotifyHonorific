@@ -39,6 +39,10 @@ public class SpotifyPollingService
     public int ApiErrorCount => _apiErrorCount;
     public double AverageResponseTime => _apiResponseTimes.Count > 0 ? _apiResponseTimes.Average() : 0;
 
+    public int RateLimit429Count { get; private set; }
+    public TimeSpan? LastRetryAfter { get; private set; }
+    public int TokenRefreshCount { get; private set; }
+
     internal RateLimitGate RateLimitGate { get; } = new();
 
     public SpotifyPollingService(Config config, IPluginLog pluginLog, IChatGui chatGui)
@@ -157,6 +161,7 @@ public class SpotifyPollingService
             ).ConfigureAwait(false);
 
             _currentAccessToken = response.AccessToken;
+            TokenRefreshCount++;
 
             _config.WithLock(() =>
             {
@@ -251,6 +256,9 @@ public class SpotifyPollingService
 
     internal void HandleRateLimit(APITooManyRequestsException e)
     {
+        RateLimit429Count++;
+        LastRetryAfter = e.RetryAfter;
+
         var pause = RateLimitGate.Activate(e.RetryAfter, DateTime.Now);
         var message = $"Spotify rate limit hit (429). Pausing polling for {pause.TotalSeconds:0}s.";
 

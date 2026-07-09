@@ -17,6 +17,11 @@ public sealed class RateLimitGate
     public bool IsActive(DateTime now) => now < _pausedUntil;
 
     /// <summary>
+    /// Time left until polling resumes; zero when the gate is not active.
+    /// </summary>
+    public TimeSpan Remaining(DateTime now) => IsActive(now) ? _pausedUntil - now : TimeSpan.Zero;
+
+    /// <summary>
     /// Starts a pause based on Spotify's Retry-After value and returns the
     /// pause actually applied (defaulted when absent, capped when excessive).
     /// </summary>

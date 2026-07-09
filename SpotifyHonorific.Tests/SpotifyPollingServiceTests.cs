@@ -99,6 +99,28 @@ public class SpotifyPollingServiceTests
         chatGui.Received(2).PrintError(Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<ushort?>());
     }
 
+    [Fact]
+    public void NewService_HasNoRateLimitHistory()
+    {
+        var service = MakeService();
+
+        service.RateLimit429Count.Should().Be(0);
+        service.LastRetryAfter.Should().BeNull();
+        service.TokenRefreshCount.Should().Be(0);
+    }
+
+    [Fact]
+    public void HandleRateLimit_CountsHitsAndRemembersRetryAfter()
+    {
+        var service = MakeService();
+
+        service.HandleRateLimit(MakeRateLimitException(retryAfterSeconds: 30));
+        service.HandleRateLimit(MakeRateLimitException(retryAfterSeconds: 90));
+
+        service.RateLimit429Count.Should().Be(2);
+        service.LastRetryAfter.Should().Be(TimeSpan.FromSeconds(90));
+    }
+
     private sealed class FakeResponse : IResponse
     {
         public object? Body { get; init; }

@@ -58,6 +58,9 @@ public class Updater : IDisposable
     private readonly HashSet<string> _tracksPlayedToday = new(100);
     private readonly DateTime _sessionStartTime;
 
+    private static readonly string PluginVersion =
+        typeof(Updater).Assembly.GetName().Version?.ToString(3) ?? "unknown";
+
     public Updater(IChatGui chatGui, Config config, IFramework framework, IDalamudPluginInterface pluginInterface, IPluginLog pluginLog, IClientState clientState, IObjectTable objectTable, PlaybackState playbackState, INotificationManager notificationManager, NearbyTitleWatcher nearbyTitleWatcher, SpotifyPollingService spotifyPollingService)
     {
         _chatGui = chatGui;
@@ -85,16 +88,34 @@ public class Updater : IDisposable
 
     public string GetPerformanceStats()
     {
-        var sessionDuration = DateTime.Now - _sessionStartTime;
+        var now = DateTime.Now;
+        var sessionDuration = now - _sessionStartTime;
+        var requestsPerMinute = (_pollingService.ApiCallCount + _pollingService.ApiErrorCount)
+            / Math.Max(sessionDuration.TotalMinutes, 1.0 / 60.0);
+        var rateLimitRemaining = _pollingService.RateLimitGate.Remaining(now);
+        var rateLimitedText = rateLimitRemaining > TimeSpan.Zero
+            ? $"Yes ({rateLimitRemaining.TotalSeconds:0}s remaining)"
+            : "No";
+        var lastRetryAfterText = _pollingService.LastRetryAfter is { } retryAfter
+            ? $"{retryAfter.TotalSeconds:0}s"
+            : "never";
 
         return $"""
             === SpotifyHonorific Performance Stats ===
+            Plugin version: {PluginVersion}
             Session Duration: {sessionDuration:hh\:mm\:ss}
 
             API Statistics:
             • Total API calls: {_pollingService.ApiCallCount}
             • API errors: {_pollingService.ApiErrorCount}
+            • Requests per minute: {requestsPerMinute:F1}
             • Average response time: {_pollingService.AverageResponseTime:F0}ms
+            • Token refreshes: {_pollingService.TokenRefreshCount}
+
+            Rate Limiting:
+            • 429s this session: {_pollingService.RateLimit429Count}
+            • Rate limited: {rateLimitedText}
+            • Last Retry-After: {lastRetryAfterText}
 
             Template Cache:
             • Cache hits: {_templateCache.CacheHits}

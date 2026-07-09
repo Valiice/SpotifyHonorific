@@ -1,5 +1,12 @@
+using Dalamud.Plugin;
+using Dalamud.Plugin.Services;
 using FluentAssertions;
+using NSubstitute;
+using SpotifyAPI.Web;
+using SpotifyAPI.Web.Http;
+using SpotifyHonorific.Core;
 using SpotifyHonorific.Updaters;
+using System.Net;
 
 namespace SpotifyHonorific.Tests;
 
@@ -365,5 +372,83 @@ public class RenderThrottleTests
     {
         Updater.TEXT_RENDER_INTERVAL_SECONDS.Should().Be(0.5);
         Updater.RAINBOW_RENDER_INTERVAL_SECONDS.Should().Be(0.1);
+    }
+}
+
+public class UpdaterPerformanceStatsTests
+{
+    private static SpotifyPollingService MakePollingService()
+    {
+        var config = new Config();
+        config.Initialize(Substitute.For<IDalamudPluginInterface>());
+        return new SpotifyPollingService(config, Substitute.For<IPluginLog>(), Substitute.For<IChatGui>());
+    }
+
+    private static Updater MakeUpdater(SpotifyPollingService pollingService)
+    {
+        var pluginInterface = Substitute.For<IDalamudPluginInterface>();
+        var config = new Config();
+        config.Initialize(pluginInterface);
+        var nearbyWatcher = new NearbyTitleWatcher(
+            Substitute.For<IObjectTable>(),
+            Substitute.For<IHonorificTitleReader>(),
+            new RecentTitleCache());
+
+        return new Updater(
+            Substitute.For<IChatGui>(),
+            config,
+            Substitute.For<IFramework>(),
+            pluginInterface,
+            Substitute.For<IPluginLog>(),
+            Substitute.For<IClientState>(),
+            Substitute.For<IObjectTable>(),
+            new PlaybackState(),
+            Substitute.For<INotificationManager>(),
+            nearbyWatcher,
+            pollingService);
+    }
+
+    private static APITooManyRequestsException MakeRateLimitException(int retryAfterSeconds) =>
+        new(new FakeResponse
+        {
+            StatusCode = HttpStatusCode.TooManyRequests,
+            Headers = new Dictionary<string, string> { ["Retry-After"] = retryAfterSeconds.ToString() },
+        });
+
+    [Fact]
+    public void GetPerformanceStats_NeverRateLimited_ShowsZeroesAndPlaceholders()
+    {
+        var updater = MakeUpdater(MakePollingService());
+
+        var stats = updater.GetPerformanceStats();
+
+        stats.Should().Contain("Plugin version: ");
+        stats.Should().Contain("Requests per minute: ");
+        stats.Should().Contain("Token refreshes: 0");
+        stats.Should().Contain("429s this session: 0");
+        stats.Should().Contain("Rate limited: No");
+        stats.Should().Contain("Last Retry-After: never");
+    }
+
+    [Fact]
+    public void GetPerformanceStats_WhileRateLimited_ShowsPauseAndRetryAfter()
+    {
+        var pollingService = MakePollingService();
+        pollingService.HandleRateLimit(MakeRateLimitException(retryAfterSeconds: 90));
+        var updater = MakeUpdater(pollingService);
+
+        var stats = updater.GetPerformanceStats();
+
+        stats.Should().Contain("429s this session: 1");
+        stats.Should().Contain("Rate limited: Yes");
+        stats.Should().Contain("Last Retry-After: 90s");
+    }
+
+    private sealed class FakeResponse : IResponse
+    {
+        public object? Body { get; init; }
+        public IReadOnlyDictionary<string, string> Headers { get; init; } = new Dictionary<string, string>();
+        public HttpStatusCode StatusCode { get; init; }
+        public string? ContentType { get; init; }
     }
 }
