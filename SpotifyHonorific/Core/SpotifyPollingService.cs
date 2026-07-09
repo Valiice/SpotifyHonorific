@@ -55,7 +55,7 @@ public class SpotifyPollingService
         _chatGui = chatGui;
     }
 
-    public async Task<FullTrack?> GetCurrentlyPlayingTrackAsync()
+    public async Task<SpotifyPollResult?> GetCurrentlyPlayingTrackAsync()
     {
         if (RateLimitGate.IsActive(DateTime.Now))
         {
@@ -92,10 +92,10 @@ public class SpotifyPollingService
 
             if (currentlyPlaying?.IsPlaying == true && currentlyPlaying.Item is FullTrack track)
             {
-                return track;
+                return new SpotifyPollResult(track, currentlyPlaying.ProgressMs);
             }
 
-            return null;
+            return new SpotifyPollResult(null, null);
         }
         catch (OperationCanceledException)
         {
@@ -302,7 +302,27 @@ public class SpotifyPollingService
             _chatGui.PrintError($"SpotifyHonorific: {message}");
         }
 
+        AutoEnableRateLimitProtection();
+
         // The token is fine; keep the client so no refresh traffic is added.
+    }
+
+    private void AutoEnableRateLimitProtection()
+    {
+        var enabledNow = _config.WithLock(() =>
+        {
+            if (_config.RateLimitProtection) return false;
+            _config.RateLimitProtection = true;
+            _config.Save();
+            return true;
+        });
+
+        if (enabledNow)
+        {
+            _chatGui.Print(
+                "SpotifyHonorific: Rate limit protection has been turned on automatically so this happens less. " +
+                "You can change this in /spotifyhonorific config.");
+        }
     }
 
     internal void RecordPollSuccess()
