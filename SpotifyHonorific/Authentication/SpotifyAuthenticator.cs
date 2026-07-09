@@ -3,6 +3,8 @@ using SpotifyAPI.Web;
 using SpotifyAPI.Web.Auth;
 using SpotifyHonorific.Utils;
 using System;
+using System.Net;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -58,9 +60,14 @@ public class SpotifyAuthenticator : IDisposable
             var code = context.Request.QueryString["code"];
             if (string.IsNullOrEmpty(code))
             {
+                RespondToBrowser(context, 400,
+                    "<html><body><h2>Spotify login failed</h2><p>No authorization code received. Close this tab and try again in the game.</p></body></html>");
                 _pluginLog.Error("Spotify auth failed: No code received.");
                 return false;
             }
+
+            RespondToBrowser(context, 200,
+                "<html><body><h2>Spotify login received</h2><p>You can close this tab and return to the game.</p></body></html>");
 
             var tokenResponse = await new OAuthClient().RequestToken(
                 new PKCETokenRequest(_config.SpotifyClientId, code, _authServer.RedirectUri, verifier)
@@ -87,6 +94,25 @@ public class SpotifyAuthenticator : IDisposable
         {
             _authServer?.Dispose();
             _authServer = null;
+        }
+    }
+
+    private void RespondToBrowser(HttpListenerContext context, int statusCode, string html)
+    {
+        try
+        {
+            var buffer = Encoding.UTF8.GetBytes(html);
+            context.Response.StatusCode = statusCode;
+            context.Response.ContentType = "text/html; charset=utf-8";
+            context.Response.ContentLength64 = buffer.Length;
+            context.Response.OutputStream.Write(buffer, 0, buffer.Length);
+            context.Response.Close();
+        }
+        catch (Exception e)
+        {
+            // The browser may have gone away; a failed response page must
+            // not fail the authentication itself.
+            _pluginLog.Warning(e, "Could not write OAuth callback response to the browser.");
         }
     }
 

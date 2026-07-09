@@ -57,9 +57,10 @@ public sealed class Plugin : IDalamudPlugin
         HonorificTitleReader = new HonorificTitleReader(PluginInterface, PluginLog);
         RecentTitleCache = new RecentTitleCache();
         NearbyTitleWatcher = new NearbyTitleWatcher(ObjectTable, HonorificTitleReader, RecentTitleCache);
-        SpotifyPollingService = new SpotifyPollingService(Config, PluginLog, ChatGui);
+        var chatNotifier = new ChatNotifier(ChatGui, Framework);
+        SpotifyPollingService = new SpotifyPollingService(Config, PluginLog, chatNotifier);
         Updater = new(ChatGui, Config, Framework, PluginInterface, PluginLog, ClientState, ObjectTable, PlaybackState, NotificationManager, NearbyTitleWatcher, SpotifyPollingService);
-        TrackQueueService = new TrackQueueService(SpotifyPollingService, PluginLog, ChatGui);
+        TrackQueueService = new TrackQueueService(SpotifyPollingService, PluginLog, chatNotifier);
         NearbyTrackContextMenu = new NearbyTrackContextMenu(ContextMenu, HonorificTitleReader, RecentTitleCache, TrackQueueService, PluginLog, ChatGui);
         SpotifyAuthenticator = new SpotifyAuthenticator(Config, PluginLog);
         var nearbyListeningView = new NearbyListeningView(NearbyTitleWatcher, RecentTitleCache, TrackQueueService, ChatGui);
@@ -80,11 +81,16 @@ public sealed class Plugin : IDalamudPlugin
 
     public void Dispose()
     {
+        PluginInterface.UiBuilder.Draw -= DrawUI;
+        PluginInterface.UiBuilder.OpenConfigUi -= ToggleConfigUI;
+        PluginInterface.UiBuilder.OpenMainUi -= ToggleConfigUI;
+
         WindowSystem.RemoveAllWindows();
         CommandManager.RemoveHandler(CommandName);
         NearbyTrackContextMenu.Dispose();
         SpotifyAuthenticator.Dispose();
         Updater.Dispose();
+        SpotifyPollingService.Dispose();
     }
 
     private void OnCommand(string command, string args)

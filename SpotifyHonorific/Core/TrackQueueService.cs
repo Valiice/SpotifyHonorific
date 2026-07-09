@@ -15,13 +15,13 @@ public class TrackQueueService
 
     private readonly SpotifyPollingService _pollingService;
     private readonly IPluginLog _pluginLog;
-    private readonly IChatGui _chatGui;
+    private readonly ChatNotifier _chat;
 
-    public TrackQueueService(SpotifyPollingService pollingService, IPluginLog pluginLog, IChatGui chatGui)
+    public TrackQueueService(SpotifyPollingService pollingService, IPluginLog pluginLog, ChatNotifier chat)
     {
         _pollingService = pollingService;
         _pluginLog = pluginLog;
-        _chatGui = chatGui;
+        _chat = chat;
     }
 
     public async Task QueueTrackFromTitleAsync(string rawTitle, IReadOnlyList<string>? titleHints = null)
@@ -29,7 +29,7 @@ public class TrackQueueService
         var query = TitleTextCleaner.Clean(rawTitle);
         if (string.IsNullOrWhiteSpace(query))
         {
-            _chatGui.Print("SpotifyHonorific: No track found in their title.");
+            _chat.Print("SpotifyHonorific: No track found in their title.");
             return;
         }
 
@@ -38,7 +38,7 @@ public class TrackQueueService
             var spotify = await _pollingService.GetAuthenticatedClientAsync().ConfigureAwait(false);
             if (spotify == null)
             {
-                _chatGui.PrintError("SpotifyHonorific: Not authenticated with Spotify. Use /spotifyhonorific config to log in.");
+                _chat.PrintError("SpotifyHonorific: Not authenticated with Spotify. Use /spotifyhonorific config to log in.");
                 return;
             }
 
@@ -48,7 +48,7 @@ public class TrackQueueService
             var tracks = searchResponse.Tracks?.Items;
             if (tracks == null || tracks.Count == 0)
             {
-                _chatGui.Print($"SpotifyHonorific: No track found for \"{query}\".");
+                _chat.Print($"SpotifyHonorific: No track found for \"{query}\".");
                 return;
             }
 
@@ -56,29 +56,29 @@ public class TrackQueueService
 
             await spotify.Player.AddToQueue(new PlayerAddToQueueRequest(track.Uri)).ConfigureAwait(false);
             var artistNames = string.Join(", ", track.Artists.Select(a => a.Name));
-            _chatGui.Print($"SpotifyHonorific: Queued \"{track.Name}\" by {artistNames}.");
+            _chat.Print($"SpotifyHonorific: Queued \"{track.Name}\" by {artistNames}.");
         }
         catch (APIUnauthorizedException e)
         {
             _pluginLog.Warning(e, "Spotify rejected queue request as unauthorized (token missing the queue scope or expired).");
-            _chatGui.PrintError("SpotifyHonorific: Spotify authorization is missing the queue permission. Re-click 'Authenticate with Spotify' in /spotifyhonorific config, then try again.");
+            _chat.PrintError("SpotifyHonorific: Spotify authorization is missing the queue permission. Re-click 'Authenticate with Spotify' in /spotifyhonorific config, then try again.");
         }
         catch (APIException e) when (e.Response?.StatusCode == HttpStatusCode.Forbidden)
         {
             _pluginLog.Warning(e, "Spotify rejected queue request due to insufficient scope.");
-            _chatGui.PrintError("SpotifyHonorific: Queueing needs a Spotify permission this plugin didn't have before. Re-click 'Authenticate with Spotify' in /spotifyhonorific config, then try again.");
+            _chat.PrintError("SpotifyHonorific: Queueing needs a Spotify permission this plugin didn't have before. Re-click 'Authenticate with Spotify' in /spotifyhonorific config, then try again.");
         }
         catch (APIException e) when (e.Response?.StatusCode == HttpStatusCode.NotFound)
         {
             // Spotify returns 404 NO_ACTIVE_DEVICE when nothing has played
             // recently, the queue needs an active playback session to attach to.
             _pluginLog.Warning(e, "Spotify queue request failed: no active device.");
-            _chatGui.PrintError("SpotifyHonorific: No active Spotify device. Open Spotify and play or pause something first, then try again.");
+            _chat.PrintError("SpotifyHonorific: No active Spotify device. Open Spotify and play or pause something first, then try again.");
         }
         catch (Exception e)
         {
             _pluginLog.Error(e, "Failed to queue track from nearby title.");
-            _chatGui.PrintError("SpotifyHonorific: Failed to queue track. Check /xllog for details.");
+            _chat.PrintError("SpotifyHonorific: Failed to queue track. Check /xllog for details.");
         }
     }
 
