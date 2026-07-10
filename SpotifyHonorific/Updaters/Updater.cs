@@ -65,7 +65,7 @@ public class Updater : IDisposable
     private bool _isTitleTimeDependent;
     private int _lastSeenConfigRevision;
 
-    private readonly HashSet<string> _tracksPlayedToday = new(100);
+    private readonly HashSet<string> _tracksPlayedThisSession = new(100);
     private readonly DateTime _sessionStartTime;
 
     private static readonly string PluginVersion =
@@ -138,7 +138,7 @@ public class Updater : IDisposable
             • Cached templates: {_templateCache.CachedTemplateCount}
 
             Music:
-            • Unique tracks today: {_tracksPlayedToday.Count}
+            • Unique tracks this session: {_tracksPlayedThisSession.Count}
             • Currently playing: {(_isMusicPlaying ? "Yes" : "No")}
             • Player AFK: {(IsPlayerAfk ? "Yes" : "No")}
             """;
@@ -222,7 +222,7 @@ public class Updater : IDisposable
             music = new
             {
                 currentlyPlaying = _isMusicPlaying,
-                uniqueTracksToday = _tracksPlayedToday.Count,
+                uniqueTracksSession = _tracksPlayedThisSession.Count,
                 currentTrackName = track?.Name,
                 currentTrackArtists = track?.Artists.Select(a => a.Name).ToList(),
             },
@@ -447,7 +447,7 @@ public class Updater : IDisposable
         if (track != null)
         {
             _isMusicPlaying = true;
-            _tracksPlayedToday.Add(track.Id);
+            _tracksPlayedThisSession.Add(track.Id);
             ProcessCurrentlyPlayingTrack(track);
         }
         else

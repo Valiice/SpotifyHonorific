@@ -11,11 +11,22 @@ namespace SpotifyHonorific.Tests;
 
 public class SpotifyPollingServiceTests
 {
+    private static ChatNotifier MakeChatNotifier(IChatGui chatGui)
+    {
+        var framework = Substitute.For<IFramework>();
+        framework.RunOnFrameworkThread(Arg.Any<Action>())
+            .Returns(ci => { ci.Arg<Action>()(); return Task.CompletedTask; });
+        return new ChatNotifier(chatGui, framework);
+    }
+
     private static SpotifyPollingService MakeService(out Config config, IPluginLog? pluginLog = null, IChatGui? chatGui = null)
     {
         config = new Config();
         config.Initialize(Substitute.For<IDalamudPluginInterface>());
-        return new SpotifyPollingService(config, pluginLog ?? Substitute.For<IPluginLog>(), chatGui ?? Substitute.For<IChatGui>());
+        return new SpotifyPollingService(
+            config,
+            pluginLog ?? Substitute.For<IPluginLog>(),
+            MakeChatNotifier(chatGui ?? Substitute.For<IChatGui>()));
     }
 
     private static SpotifyPollingService MakeService(IPluginLog? pluginLog = null, IChatGui? chatGui = null)
@@ -43,6 +54,25 @@ public class SpotifyPollingServiceTests
         }
 
         await Assert.ThrowsAsync<APITooManyRequestsException>(() => service.RetryAsync(Operation));
+
+        attempts.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task RetryAsync_Timeout_ThrowsImmediatelyWithoutRetrying()
+    {
+        // The timeout CTS is shared across attempts, so retrying after a
+        // timeout just burns the backoff delays re-throwing instantly.
+        var service = MakeService();
+        var attempts = 0;
+
+        Task<string> Operation()
+        {
+            attempts++;
+            throw new OperationCanceledException();
+        }
+
+        await Assert.ThrowsAsync<OperationCanceledException>(() => service.RetryAsync(Operation));
 
         attempts.Should().Be(1);
     }
@@ -255,6 +285,25 @@ public class SpotifyPollingServiceTests
         chatGui.DidNotReceive().Print(
             Arg.Is<string>(s => s.Contains("Rate limit protection")),
             Arg.Any<string?>(), Arg.Any<ushort?>());
+    }
+
+    [Fact]
+    public void TokenRefreshTimeout_IsThirtySeconds()
+    {
+        // A refresh consumes the single-use rotating refresh token even when
+        // the client gives up waiting; 30s absorbs slow post-login networks.
+        SpotifyPollingService.TOKEN_REFRESH_TIMEOUT_MS.Should().Be(30000);
+    }
+
+    [Fact]
+    public void Dispose_IsIdempotent()
+    {
+        var service = MakeService();
+
+        service.Dispose();
+        var act = () => service.Dispose();
+
+        act.Should().NotThrow();
     }
 
     private sealed class FakeResponse : IResponse

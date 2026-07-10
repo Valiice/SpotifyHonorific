@@ -41,6 +41,7 @@ public class ConfigWindow : Window
     private int _cachedConfigCount;
     private float _kofiButtonWidth;
     private bool _confirmDeleteAll;
+    private bool _pendingSave;
     private bool _authInProgress;
     private string _nerdStatsCache = string.Empty;
     private DateTime _nerdStatsBuiltAt = DateTime.MinValue;
@@ -98,6 +99,13 @@ public class ConfigWindow : Window
                 ImGui.EndTabItem();
             }
             ImGui.EndTabBar();
+        }
+
+        // Tab switches hide an edited input before its deactivation check
+        // can run; flush any pending save once nothing is being edited.
+        if (_pendingSave && !ImGui.IsAnyItemActive())
+        {
+            SaveIfPending();
         }
     }
 
@@ -232,6 +240,19 @@ public class ConfigWindow : Window
         }
     }
 
+    private void SaveIfPending()
+    {
+        if (!_pendingSave) return;
+        _pendingSave = false;
+        Config.Save();
+    }
+
+    public override void OnClose()
+    {
+        base.OnClose();
+        SaveIfPending();
+    }
+
     private void DrawValidationErrors()
     {
         if (Config.Validate(out var errors))
@@ -295,7 +316,11 @@ public class ConfigWindow : Window
         if (ImGui.InputText("Spotify Client ID", ref _spotifyClientIdBuffer, SPOTIFY_CLIENT_ID_MAX_LENGTH))
         {
             Config.SpotifyClientId = _spotifyClientIdBuffer;
-            Config.Save();
+            _pendingSave = true;
+        }
+        if (ImGui.IsItemDeactivatedAfterEdit())
+        {
+            SaveIfPending();
         }
 
         DrawAuthenticateButton();
@@ -452,7 +477,11 @@ public class ConfigWindow : Window
         if (ImGui.InputText($"Name###{activityConfigId}Name", ref name, MAX_INPUT_LENGTH))
         {
             activityConfig.Name = name;
-            Config.Save();
+            _pendingSave = true;
+        }
+        if (ImGui.IsItemDeactivatedAfterEdit())
+        {
+            SaveIfPending();
         }
 
         var exportWidth = ImGui.CalcTextSize("Export").X + (ImGui.GetStyle().FramePadding.X * 2.0f);
@@ -531,7 +560,11 @@ public class ConfigWindow : Window
                              "Expects parsable boolean as output if provided\nSyntax reference available on https://github.com/scriban/scriban"))
         {
             activityConfig.FilterTemplate = filterTemplate;
-            Config.Save();
+            _pendingSave = true;
+        }
+        if (ImGui.IsItemDeactivatedAfterEdit())
+        {
+            SaveIfPending();
         }
 
         if (DrawTemplateInput($"Title Template (scriban)###{activityConfigId}TitleTemplate",
@@ -540,7 +573,11 @@ public class ConfigWindow : Window
                              "Expects single line as output (max: 32 characters)\nSyntax reference available on https://github.com/scriban/scriban"))
         {
             activityConfig.TitleTemplate = titleTemplate;
-            Config.Save();
+            _pendingSave = true;
+        }
+        if (ImGui.IsItemDeactivatedAfterEdit())
+        {
+            SaveIfPending();
         }
 
         DrawTitleStyleSettings(activityConfig, activityConfigId);

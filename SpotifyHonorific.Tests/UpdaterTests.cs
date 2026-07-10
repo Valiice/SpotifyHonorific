@@ -397,11 +397,19 @@ public class RenderThrottleTests
 
 public class UpdaterPerformanceStatsTests
 {
+    private static ChatNotifier MakeChatNotifier(IChatGui chatGui)
+    {
+        var framework = Substitute.For<IFramework>();
+        framework.RunOnFrameworkThread(Arg.Any<Action>())
+            .Returns(ci => { ci.Arg<Action>()(); return Task.CompletedTask; });
+        return new ChatNotifier(chatGui, framework);
+    }
+
     private static SpotifyPollingService MakePollingService()
     {
         var config = new Config();
         config.Initialize(Substitute.For<IDalamudPluginInterface>());
-        return new SpotifyPollingService(config, Substitute.For<IPluginLog>(), Substitute.For<IChatGui>());
+        return new SpotifyPollingService(config, Substitute.For<IPluginLog>(), MakeChatNotifier(Substitute.For<IChatGui>()));
     }
 
     private static Updater MakeUpdater(SpotifyPollingService pollingService, out Config config)
@@ -482,6 +490,17 @@ public class UpdaterPerformanceStatsTests
         updater.GetPerformanceStats().Should().Contain("Rate limit protection: On (current interval: 2s)");
     }
 
+    [Fact]
+    public void GetPerformanceStats_LabelsTrackCountAsSession()
+    {
+        var updater = MakeUpdater(MakePollingService(), out _);
+
+        var stats = updater.GetPerformanceStats();
+
+        stats.Should().Contain("Unique tracks this session: 0");
+        stats.Should().NotContain("Unique tracks today");
+    }
+
     private sealed class FakeResponse : IResponse
     {
         public object? Body { get; init; }
@@ -493,12 +512,20 @@ public class UpdaterPerformanceStatsTests
 
 public class UpdaterDiagnosticReportTests
 {
+    private static ChatNotifier MakeChatNotifier(IChatGui chatGui)
+    {
+        var framework = Substitute.For<IFramework>();
+        framework.RunOnFrameworkThread(Arg.Any<Action>())
+            .Returns(ci => { ci.Arg<Action>()(); return Task.CompletedTask; });
+        return new ChatNotifier(chatGui, framework);
+    }
+
     private static Updater MakeUpdater(out Config config, out SpotifyPollingService pollingService, out NearbyTitleWatcher watcher)
     {
         var pluginInterface = Substitute.For<IDalamudPluginInterface>();
         config = new Config(ActivityConfig.GetDefaults());
         config.Initialize(pluginInterface);
-        pollingService = new SpotifyPollingService(config, Substitute.For<IPluginLog>(), Substitute.For<IChatGui>());
+        pollingService = new SpotifyPollingService(config, Substitute.For<IPluginLog>(), MakeChatNotifier(Substitute.For<IChatGui>()));
         watcher = new NearbyTitleWatcher(
             Substitute.For<IObjectTable>(),
             Substitute.For<IHonorificTitleReader>(),
@@ -601,6 +628,19 @@ public class UpdaterDiagnosticReportTests
         json.Should().Contain("player2");
         // Same character maps to the same placeholder in history and cache.
         System.Text.RegularExpressions.Regex.Matches(json, "player1").Count.Should().Be(2);
+    }
+
+    [Fact]
+    public void Report_UsesSessionKeyForTrackCount()
+    {
+        var updater = MakeUpdater(out _, out _, out _);
+
+        var json = updater.GetDiagnosticReportJson();
+
+        using var doc = JsonDocument.Parse(json);
+        var music = doc.RootElement.GetProperty("music");
+        music.TryGetProperty("uniqueTracksSession", out _).Should().BeTrue();
+        music.TryGetProperty("uniqueTracksToday", out _).Should().BeFalse();
     }
 
     private sealed class FakeResponse : IResponse

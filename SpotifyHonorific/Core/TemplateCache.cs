@@ -9,6 +9,8 @@ namespace SpotifyHonorific.Core;
 /// </summary>
 public class TemplateCache
 {
+    internal const int MAX_CACHED_TEMPLATES = 64;
+
     private readonly Dictionary<string, Template> _cache = new(16);
     private readonly IPluginLog _pluginLog;
 
@@ -49,6 +51,14 @@ public class TemplateCache
             errorMessage = $"Template parsing failed: {string.Join(", ", template.Messages)}";
             _pluginLog.Error(errorMessage);
             return null;
+        }
+
+        // Template editing renders every intermediate string once; without a
+        // cap the dictionary grows for the whole session. Clearing is cheap
+        // and the active templates re-cache on their next render.
+        if (_cache.Count >= MAX_CACHED_TEMPLATES)
+        {
+            _cache.Clear();
         }
 
         _cache[templateSource] = template;
