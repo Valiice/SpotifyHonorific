@@ -29,6 +29,7 @@ public class Updater : IDisposable
     private const double AFK_MUSIC_GRACE_SECONDS = 10.0;
     internal const double TEXT_RENDER_INTERVAL_SECONDS = 0.5;
     internal const double RAINBOW_RENDER_INTERVAL_SECONDS = 0.1;
+    internal const double POLL_FAILURE_GRACE_SECONDS = 60.0;
 
     private readonly IChatGui _chatGui;
     private readonly Config _config;
@@ -64,6 +65,7 @@ public class Updater : IDisposable
     private double _renderInterval = TEXT_RENDER_INTERVAL_SECONDS;
     private bool _isTitleTimeDependent;
     private int _lastSeenConfigRevision;
+    private DateTime? _pollFailureStreakStart;
 
     private readonly HashSet<string> _tracksPlayedThisSession = new(100);
     private readonly DateTime _sessionStartTime;
@@ -124,6 +126,7 @@ public class Updater : IDisposable
             • Requests per minute: {requestsPerMinute:F1}
             • Average response time: {_pollingService.AverageResponseTime:F0}ms
             • Token refreshes: {_pollingService.TokenRefreshCount}
+            • Token rejections recovered: {_pollingService.AuthRecoveredCount}/{_pollingService.AuthRetryCount}
 
             Rate Limiting:
             • 429s this session: {_pollingService.RateLimit429Count}
@@ -199,6 +202,8 @@ public class Updater : IDisposable
                     / Math.Max(sessionDuration.TotalMinutes, 1.0 / 60.0),
                 averageResponseMs = _pollingService.AverageResponseTime,
                 tokenRefreshCount = _pollingService.TokenRefreshCount,
+                authRetryCount = _pollingService.AuthRetryCount,
+                authRecoveredCount = _pollingService.AuthRecoveredCount,
                 responseTimesMs = _pollingService.GetResponseTimeSnapshot(),
             },
             rateLimit = new
@@ -438,13 +443,26 @@ public class Updater : IDisposable
 
     private void ProcessPollResult(SpotifyPollResult? result)
     {
+        var failureStreakSeconds = TrackPollFailureStreak(result, DateTime.Now);
+        var outcome = ClassifyPoll(result, failureStreakSeconds, POLL_FAILURE_GRACE_SECONDS);
+
+        if (outcome == PollOutcome.HoldTitle)
+        {
+            // Leave the title, the track and _isMusicPlaying exactly as they
+            // are, and re-check soon: the point of holding is a fast recovery,
+            // and a gate-skipped poll costs no request anyway.
+            _currentPollIntervalSeconds = ComputeNextPollInterval(
+                _config.RateLimitProtection, _isMusicPlaying, null, null);
+            return;
+        }
+
         var track = result?.Track;
         _playbackState.CurrentTrack = track;
 
         _currentPollIntervalSeconds = ComputeNextPollInterval(
             _config.RateLimitProtection, track != null, result?.ProgressMs, track?.DurationMs);
 
-        if (track != null)
+        if (outcome == PollOutcome.Playing && track != null)
         {
             _isMusicPlaying = true;
             _tracksPlayedThisSession.Add(track.Id);
@@ -458,10 +476,41 @@ public class Updater : IDisposable
         }
     }
 
+    // Returns how long the current run of failed polls has lasted, and resets
+    // that run on any successful poll.
+    private double TrackPollFailureStreak(SpotifyPollResult? result, DateTime now)
+    {
+        if (result != null)
+        {
+            _pollFailureStreakStart = null;
+            return 0;
+        }
+
+        _pollFailureStreakStart ??= now;
+        return (now - _pollFailureStreakStart.Value).TotalSeconds;
+    }
+
+    // A failed poll is not the same as "music stopped". A spurious 401, a
+    // timeout or a rate-limit pause all surface as a null result, and treating
+    // them as silence blanked the title for a whole poll interval and made
+    // other players watching the title see it vanish mid-song. Hold the last
+    // title through short outages; a sustained one still clears, because a
+    // permanently stale title is worse than none.
+    internal static PollOutcome ClassifyPoll(SpotifyPollResult? result, double failureStreakSeconds, double graceSeconds)
+    {
+        if (result != null)
+        {
+            return result.Track != null ? PollOutcome.Playing : PollOutcome.Stopped;
+        }
+
+        return failureStreakSeconds < graceSeconds ? PollOutcome.HoldTitle : PollOutcome.Stopped;
+    }
+
     // Rate limit protection trades title responsiveness for fewer API
     // requests: quick polls near a track's start (catches skips) and end
     // (catches the transition), relaxed polls mid-track and while idle.
-    // Failed or gate-skipped polls also land in the idle interval on purpose.
+    // Failed polls pass the last known playing state, so an outage during a
+    // song retries at the edge interval and idle silence stays relaxed.
     internal static double ComputeNextPollInterval(bool protectionOn, bool hasTrack, int? progressMs, int? durationMs)
     {
         if (!protectionOn) return POLLING_INTERVAL_SECONDS;
@@ -579,6 +628,12 @@ public class Updater : IDisposable
 
     private void ClearTitle()
     {
+        // There is no longer a title to hold, so the next failure starts its
+        // grace window fresh. Without this the streak survives every pause
+        // (disabled, AFK, a long rate limit) and the first failure after one
+        // reads as an hours-long outage and skips the hold entirely.
+        _pollFailureStreakStart = null;
+
         if (_titleState.LastSentJson == null) return;
 
         _pluginLog.Debug("Call Honorific ClearCharacterTitle IPC");
