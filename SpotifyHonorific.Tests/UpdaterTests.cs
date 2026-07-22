@@ -395,6 +395,58 @@ public class RenderThrottleTests
     }
 }
 
+public class ClassifyPollTests
+{
+    private const double Grace = Updater.POLL_FAILURE_GRACE_SECONDS;
+
+    private static FullTrack MakeTrack() => new() { Id = "track1", Name = "Song", DurationMs = 200_000 };
+
+    [Fact]
+    public void TrackPlaying_IsPlaying()
+    {
+        var result = new SpotifyPollResult(MakeTrack(), 1000);
+
+        Updater.ClassifyPoll(result, 0, Grace).Should().Be(PollOutcome.Playing);
+    }
+
+    [Fact]
+    public void SuccessfulPollWithNoTrack_IsStopped()
+    {
+        // A real "nothing is playing" answer from Spotify: the title should go.
+        var result = new SpotifyPollResult(null, null);
+
+        Updater.ClassifyPoll(result, 0, Grace).Should().Be(PollOutcome.Stopped);
+    }
+
+    [Fact]
+    public void FailedPoll_HoldsTheTitle()
+    {
+        // The bug: a null result (401, timeout, rate-limit pause) was treated
+        // as "music stopped" and blanked the title for a whole poll interval.
+        Updater.ClassifyPoll(null, 0, Grace).Should().Be(PollOutcome.HoldTitle);
+    }
+
+    [Fact]
+    public void FailedPollsWithinGrace_KeepHoldingTheTitle()
+    {
+        Updater.ClassifyPoll(null, Grace - 0.001, Grace).Should().Be(PollOutcome.HoldTitle);
+    }
+
+    [Fact]
+    public void FailedPollsPastGrace_GiveUpAndClear()
+    {
+        // A sustained outage is not a hiccup: a stale title forever is worse
+        // than no title, so the hold has a deadline.
+        Updater.ClassifyPoll(null, Grace, Grace).Should().Be(PollOutcome.Stopped);
+    }
+
+    [Fact]
+    public void GracePeriod_MatchesSpec()
+    {
+        Updater.POLL_FAILURE_GRACE_SECONDS.Should().Be(60.0);
+    }
+}
+
 public class UpdaterPerformanceStatsTests
 {
     private static ChatNotifier MakeChatNotifier(IChatGui chatGui)

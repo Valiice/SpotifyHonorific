@@ -42,8 +42,11 @@ public class TrackQueueService
                 return;
             }
 
-            var searchResponse = await spotify.Search
-                .Item(new SearchRequest(SearchRequest.Types.Track, query) { Limit = SEARCH_RESULT_LIMIT })
+            // Both calls go through the auth retry: the spurious 401s that hit
+            // the poll loop hit these too, and without it a transient rejection
+            // tells the user to re-authenticate, which does not help.
+            var searchResponse = await _pollingService.RunWithAuthRetryAsync(spotify, s => s.Search
+                .Item(new SearchRequest(SearchRequest.Types.Track, query) { Limit = SEARCH_RESULT_LIMIT }))
                 .ConfigureAwait(false);
             var tracks = searchResponse.Tracks?.Items;
             if (tracks == null || tracks.Count == 0)
@@ -54,7 +57,8 @@ public class TrackQueueService
 
             var track = PickBestMatch(tracks, titleHints ?? [query]);
 
-            await spotify.Player.AddToQueue(new PlayerAddToQueueRequest(track.Uri)).ConfigureAwait(false);
+            await _pollingService.RunWithAuthRetryAsync(spotify,
+                s => s.Player.AddToQueue(new PlayerAddToQueueRequest(track.Uri))).ConfigureAwait(false);
             var artistNames = string.Join(", ", track.Artists.Select(a => a.Name));
             _chat.Print($"SpotifyHonorific: Queued \"{track.Name}\" by {artistNames}.");
         }
