@@ -57,7 +57,11 @@ public class TrackQueueService
 
             var track = PickBestMatch(tracks, titleHints ?? [query]);
 
-            await _pollingService.RunWithAuthRetryAsync(spotify,
+            // Re-read the client: if the search above recovered from a 401 it
+            // did so onto a fresh one, and starting the queue call from the
+            // rejected client would burn a second refresh to rediscover that.
+            var queueClient = await _pollingService.GetAuthenticatedClientAsync().ConfigureAwait(false) ?? spotify;
+            await _pollingService.RunWithAuthRetryAsync(queueClient,
                 s => s.Player.AddToQueue(new PlayerAddToQueueRequest(track.Uri))).ConfigureAwait(false);
             var artistNames = string.Join(", ", track.Artists.Select(a => a.Name));
             _chat.Print($"SpotifyHonorific: Queued \"{track.Name}\" by {artistNames}.");
