@@ -447,6 +447,46 @@ public class ClassifyPollTests
     }
 }
 
+public class AfkResumeTests
+{
+    [Fact]
+    public void ComingBackFromAfk_ForcesAResend()
+    {
+        // The reported bug: after AFK ended, polling resumed and the song was
+        // playing, but the title stayed on the native one because the dedup
+        // cache still believed the song title was on screen. Only a track
+        // change repainted it. The AFK->active edge must force the re-send.
+        Updater.ShouldResendOnAfkExit(wasAfk: true, isAfkNow: false).Should().BeTrue();
+    }
+
+    [Fact]
+    public void StayingAfk_DoesNotResend()
+    {
+        Updater.ShouldResendOnAfkExit(wasAfk: true, isAfkNow: true).Should().BeFalse();
+    }
+
+    [Fact]
+    public void GoingAfk_DoesNotResend()
+    {
+        Updater.ShouldResendOnAfkExit(wasAfk: false, isAfkNow: true).Should().BeFalse();
+    }
+
+    [Fact]
+    public void StayingActive_DoesNotResend()
+    {
+        Updater.ShouldResendOnAfkExit(wasAfk: false, isAfkNow: false).Should().BeFalse();
+    }
+
+    [Fact]
+    public void AfkIdleHeartbeat_IsFarSlowerThanNormalPolling_ButNotAStop()
+    {
+        // The heartbeat exists so a full stop can't latch: it must actually
+        // poll (finite interval) while being much cheaper than the 2s default.
+        Updater.AFK_IDLE_POLL_SECONDS.Should().BeGreaterThan(2.0);
+        double.IsFinite(Updater.AFK_IDLE_POLL_SECONDS).Should().BeTrue();
+    }
+}
+
 public class UpdaterPerformanceStatsTests
 {
     private static ChatNotifier MakeChatNotifier(IChatGui chatGui)
