@@ -27,6 +27,7 @@ public class Updater : IDisposable
     private const double AUTH_NOTIFICATION_COOLDOWN_SECONDS = 600.0;
     private const uint AFK_ONLINE_STATUS_ID = 17;
     private const double AFK_MUSIC_GRACE_SECONDS = 10.0;
+    internal const double AFK_IDLE_POLL_SECONDS = 30.0;
     internal const double TEXT_RENDER_INTERVAL_SECONDS = 0.5;
     internal const double RAINBOW_RENDER_INTERVAL_SECONDS = 0.1;
     internal const double POLL_FAILURE_GRACE_SECONDS = 60.0;
@@ -320,7 +321,7 @@ public class Updater : IDisposable
             _nearbyTitleWatcher.Update(deltaSeconds);
         }
 
-        if (HandleAfkStatus()) return;
+        if (HandleAfkStatus(deltaSeconds)) return;
 
         CheckConfigRevision();
         ProcessTitleUpdate(deltaSeconds);
@@ -332,19 +333,34 @@ public class Updater : IDisposable
         _musicOffSeconds = _isMusicPlaying ? 0.0 : _musicOffSeconds + deltaSeconds;
     }
 
-    private bool HandleAfkStatus()
+    private bool HandleAfkStatus(double deltaSeconds)
     {
+        var wasAfk = IsPlayerAfk;
         IsPlayerAfk = IsLocalPlayerAfk();
 
         if (ShouldPauseForAfk())
         {
-            EngageAfkPause();
+            EngageAfkPause(deltaSeconds);
             return true;
+        }
+
+        // Coming back from AFK, Honorific may have dropped our title while the
+        // character was flagged away (native title took over on screen), yet
+        // our dedup cache still says the song's title is showing. On the same
+        // track nothing would ever re-push it, so the title only reappeared
+        // when the song changed. Force the next render to re-send, exactly as a
+        // zone change does.
+        if (ShouldResendOnAfkExit(wasAfk, IsPlayerAfk))
+        {
+            _titleState.ForceResend();
+            _renderTimer = _renderInterval;
         }
 
         _hasLoggedAfk = false;
         return false;
     }
+
+    internal static bool ShouldResendOnAfkExit(bool wasAfk, bool isAfkNow) => wasAfk && !isAfkNow;
 
     private bool IsLocalPlayerAfk()
         => _objectTable.LocalPlayer?.OnlineStatus.RowId == AFK_ONLINE_STATUS_ID;
@@ -352,15 +368,31 @@ public class Updater : IDisposable
     private bool ShouldPauseForAfk()
         => IsPlayerAfk && !_isMusicPlaying && _musicOffSeconds > AFK_MUSIC_GRACE_SECONDS;
 
-    private void EngageAfkPause()
+    // While AFK with no music we drop the title and back off to a slow
+    // heartbeat instead of stopping entirely. Polling is the only thing that
+    // sets _isMusicPlaying, so a full stop latches: music that resumes while
+    // AFK (a repeat-one loop, an unpause) is never seen until the player
+    // interacts. The heartbeat lets a resumed track lift the pause on its own.
+    private void EngageAfkPause(double deltaSeconds)
     {
         if (!_hasLoggedAfk)
         {
-            _pluginLog.Debug("Player is AFK and no music is playing, stopping polling.");
+            _pluginLog.Debug("Player is AFK and no music is playing, backing off to a slow heartbeat.");
             _hasLoggedAfk = true;
         }
         ClearTitle();
+        HeartbeatPoll(deltaSeconds);
+    }
+
+    private void HeartbeatPoll(double deltaSeconds)
+    {
+        if (_config.SpotifyRefreshToken.IsNullOrWhitespace()) return;
+
+        _pollingTimer += deltaSeconds;
+        if (_pollingTimer < AFK_IDLE_POLL_SECONDS || _isPolling) return;
+
         _pollingTimer = 0.0;
+        _ = PollSpotifyAsync();
     }
 
     private void ProcessTitleUpdate(double deltaSeconds)
