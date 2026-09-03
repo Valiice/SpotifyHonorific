@@ -18,7 +18,7 @@ public class TitleRenderingService
     private readonly IPluginLog _pluginLog;
     private readonly IChatGui _chatGui;
 
-    private bool _displayedMaxLengthError;
+    private bool _warnedAboutTruncation;
 
     public TitleRenderingService(TemplateCache templateCache, IPluginLog pluginLog, IChatGui chatGui)
     {
@@ -41,18 +41,28 @@ public class TitleRenderingService
 
         if (title.Length > MAX_TITLE_LENGTH)
         {
-            if (!_displayedMaxLengthError)
-            {
-                var message = $"Title '{title}' is longer than {MAX_TITLE_LENGTH} characters, it won't be applied by honorific. Trim whitespaces or truncate variables to reduce the length.";
-                _pluginLog.Error(message);
-                _chatGui.PrintError(message, "SpotifyHonorific");
-                _displayedMaxLengthError = true;
-            }
-            return null;
+            title = TruncateToLimit(title);
+            WarnAboutTruncationOnce();
         }
 
-        _displayedMaxLengthError = false;
         return title;
+    }
+
+    // Honorific rejects titles over the limit outright. Dropping the render
+    // used to leave the previous song's title on screen with no visible
+    // update, which read as the plugin being broken. Cutting the tail keeps
+    // the title moving; the one-time notice tells the user how to control
+    // where the cut lands.
+    private static string TruncateToLimit(string title) => title[..MAX_TITLE_LENGTH].TrimEnd();
+
+    private void WarnAboutTruncationOnce()
+    {
+        if (_warnedAboutTruncation) return;
+        _warnedAboutTruncation = true;
+
+        var message = $"A rendered title exceeded {MAX_TITLE_LENGTH} characters and was cut short. Use 'string.truncate' in your template to choose where it is trimmed.";
+        _pluginLog.Warning(message);
+        _chatGui.Print(message, "SpotifyHonorific");
     }
 
     public string SerializeTitleData(string title, ActivityConfig activityConfig, UpdaterContext context, bool isHonorificSupporter)

@@ -88,10 +88,12 @@ When writing your Title Template, you can use the following variables:
 
 **Simple Artist - Song**
 ```scriban
-{{ Activity.Artists[0].Name }} - {{ Activity.Name }}
-````
+{{ Activity.Artists[0].Name | string.truncate 14 }} - {{ Activity.Name | string.truncate 15 }}
+```
 
 **Truncate long names (Max 32 chars)**
+
+Honorific only accepts titles up to 32 characters. If a rendered title is longer, the plugin cuts off the end so the title keeps updating, and prints a one-time chat notice. Use `string.truncate` on the long variables to decide where the cut lands instead.
 
 ```scriban
 {{ Activity.Name | string.truncate 30 }}
