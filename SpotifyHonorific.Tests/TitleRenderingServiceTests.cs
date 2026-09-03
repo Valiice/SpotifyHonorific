@@ -1,3 +1,4 @@
+using SpotifyAPI.Web;
 using Dalamud.Plugin.Services;
 using FluentAssertions;
 using Newtonsoft.Json.Linq;
@@ -83,5 +84,75 @@ public class TitleRenderingServiceTests
         var obj = JObject.Parse(json);
         obj["Title"]!.Value<string>().Should().Be("My Title");
         obj["IsPrefix"]!.Value<bool>().Should().BeTrue();
+    }
+}
+
+public class TitleRenderingServiceOverflowTests
+{
+    private readonly IChatGui _chatGui = Substitute.For<IChatGui>();
+    private readonly TitleRenderingService _service;
+
+    public TitleRenderingServiceOverflowTests()
+    {
+        var cache = new TemplateCache(Substitute.For<IPluginLog>());
+        _service = new TitleRenderingService(cache, Substitute.For<IPluginLog>(), _chatGui);
+    }
+
+    private static UpdaterContext MakeContext() => new() { SecsElapsed = 0 };
+
+    private static ActivityConfig ArtistSongTemplate() => new()
+    {
+        TitleTemplate = "{{ Activity.Artists[0].Name }} - {{ Activity.Name }}",
+    };
+
+    private static FullTrack MakeTrack(string artist, string name) => new()
+    {
+        Id = "track1",
+        Name = name,
+        Artists = [new SimpleArtist { Name = artist }],
+    };
+
+    [Fact]
+    public void RenderTitle_LongerThanLimit_IsTruncatedToLimitInsteadOfDropped()
+    {
+        var track = MakeTrack("Some Fairly Long Artist Name", "A Song Title That Overflows");
+
+        var title = _service.RenderTitle(ArtistSongTemplate(), track, MakeContext());
+
+        title.Should().Be("Some Fairly Long Artist Name - A");
+        title!.Length.Should().Be(32);
+    }
+
+    [Fact]
+    public void RenderTitle_CutLandingOnSpace_DropsTrailingWhitespace()
+    {
+        var track = MakeTrack("Some Fairly Long Artist Names", "Overflowing Song");
+
+        var title = _service.RenderTitle(ArtistSongTemplate(), track, MakeContext());
+
+        title.Should().Be("Some Fairly Long Artist Names -");
+    }
+
+    [Fact]
+    public void RenderTitle_WithinLimit_IsUnchanged()
+    {
+        var track = MakeTrack("Artist", "Song");
+
+        var title = _service.RenderTitle(ArtistSongTemplate(), track, MakeContext());
+
+        title.Should().Be("Artist - Song");
+    }
+
+    [Fact]
+    public void RenderTitle_Overflow_WarnsInChatOncePerSession()
+    {
+        var first = MakeTrack("Some Fairly Long Artist Name", "A Song Title That Overflows");
+        var second = MakeTrack("Another Fairly Long Artist Name", "Another Overflowing Song");
+
+        _service.RenderTitle(ArtistSongTemplate(), first, MakeContext());
+        _service.RenderTitle(ArtistSongTemplate(), second, MakeContext());
+
+        _chatGui.Received(1).Print(Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<ushort?>());
+        _chatGui.DidNotReceive().PrintError(Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<ushort?>());
     }
 }
