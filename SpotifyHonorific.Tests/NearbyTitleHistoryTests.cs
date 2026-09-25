@@ -70,4 +70,24 @@ public class NearbyTitleHistoryTests
         history.Entries.Should().Contain(e => e.CharacterName == "Player0");
         history.Entries.First(e => e.CharacterName == "Player50").RawTitle.Should().Be("updated title");
     }
+
+    [Fact]
+    public void Upsert_ManyCharacters_EvictionKeepsIndexInStep()
+    {
+        var history = new NearbyTitleHistory();
+        var baseTime = new DateTime(2026, 7, 3, 12, 0, 0);
+
+        for (var i = 0; i < 100; i++)
+        {
+            history.Upsert($"Player{i}", "title", baseTime.AddSeconds(i));
+        }
+        history.Upsert("Player100", "title", baseTime.AddSeconds(100));
+
+        history.Entries.Should().NotContain(e => e.CharacterName == "Player0");
+
+        history.Upsert("Player0", "new title", baseTime.AddSeconds(200));
+
+        history.Entries.Should().HaveCount(100);
+        history.Entries.First(e => e.CharacterName == "Player0").RawTitle.Should().Be("new title");
+    }
 }

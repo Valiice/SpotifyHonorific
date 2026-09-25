@@ -9,13 +9,13 @@ public sealed class NearbyTitleHistory
     private const int MaxEntries = 100;
 
     private readonly List<NearbyPlayerEntry> _entries = new();
+    private readonly Dictionary<string, NearbyPlayerEntry> _byName = new(StringComparer.Ordinal);
 
     public IReadOnlyList<NearbyPlayerEntry> Entries => _entries;
 
     public void Upsert(string characterName, string rawTitle, DateTime seenAt)
     {
-        var existing = _entries.Find(e => e.CharacterName == characterName);
-        if (existing != null)
+        if (_byName.TryGetValue(characterName, out var existing))
         {
             existing.RawTitle = rawTitle;
             existing.LastSeen = seenAt;
@@ -27,17 +27,20 @@ public sealed class NearbyTitleHistory
             EvictOldest();
         }
 
-        _entries.Add(new NearbyPlayerEntry
+        var entry = new NearbyPlayerEntry
         {
             CharacterName = characterName,
             RawTitle = rawTitle,
             LastSeen = seenAt
-        });
+        };
+        _entries.Add(entry);
+        _byName.Add(characterName, entry);
     }
 
     private void EvictOldest()
     {
         var oldest = _entries.OrderBy(e => e.LastSeen).First();
         _entries.Remove(oldest);
+        _byName.Remove(oldest.CharacterName);
     }
 }
