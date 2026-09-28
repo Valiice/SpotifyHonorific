@@ -16,9 +16,9 @@
       },
       "Scriban": {
         "type": "Direct",
-        "requested": "[7.2.6, )",
-        "resolved": "7.2.6",
-        "contentHash": "k6DvaRY83jtigNudMoYlN5Zg42JEDDOCSeKrnpHiE5Gthkd9Fr+6VnYFnL3DqtkZTtPezJJdoX3ZfOTTFpQEMg=="
+        "requested": "[7.5.0, )",
+        "resolved": "7.5.0",
+        "contentHash": "5Dk6VXG6dimWQFRtCs202cYYkdE1GeOqpUgCwNSp4C4NhpjeMaVNssxe6Ifb1Z3HCfabvrbk9XLbvQXeZXG91w=="
       },
       "SpotifyAPI.Web": {
         "type": "Direct",
