@@ -156,3 +156,33 @@ public class TitleRenderingServiceOverflowTests
         _chatGui.DidNotReceive().PrintError(Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<ushort?>());
     }
 }
+
+public class TitleRenderingServiceProgressMsTests
+{
+    private readonly TitleRenderingService _service;
+
+    public TitleRenderingServiceProgressMsTests()
+    {
+        var cache = new TemplateCache(Substitute.For<IPluginLog>());
+        _service = new TitleRenderingService(cache, Substitute.For<IPluginLog>(), Substitute.For<IChatGui>());
+    }
+
+    private static FullTrack MakeTrack(string artist, string name) => new()
+    {
+        Id = "track1",
+        Name = name,
+        Artists = [new SimpleArtist { Name = artist }],
+    };
+
+    [Fact]
+    public void RenderTitle_ProgressMs_IsTimeSinceTrackStarted()
+    {
+        var track = MakeTrack("Artist", "Song");
+        var config = new ActivityConfig { TitleTemplate = "{{ Activity.ProgressMs // 1000 }}" };
+        var context = new UpdaterContext { TrackStartedAt = DateTimeOffset.UtcNow - TimeSpan.FromSeconds(83) };
+
+        var title = _service.RenderTitle(config, track, context);
+
+        title.Should().Be("83");
+    }
+}

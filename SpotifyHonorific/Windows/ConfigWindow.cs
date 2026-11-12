@@ -598,6 +598,8 @@ public class ConfigWindow : Window
         var isMock = playbackState.CurrentTrack == null;
         var track = isMock ? (object)CreateMockSpotifyTrack() : playbackState.CurrentTrack!;
         var mockContext = new UpdaterContext { SecsElapsed = 0 };
+        var activity = new Scriban.Runtime.ScriptObject { ["ProgressMs"] = 0 };
+        Scriban.Runtime.ScriptObjectExtensions.Import(activity, track, renamer: member => member.Name);
 
         try
         {
@@ -608,7 +610,7 @@ public class ConfigWindow : Window
             }
             else
             {
-                var renderedTitle = titleTemplate.Render(new { Activity = track, Context = mockContext }, member => member.Name);
+                var renderedTitle = titleTemplate.Render(new { Activity = activity, Context = mockContext }, member => member.Name);
 
                 ImGui.Text("Result:");
                 ImGui.SameLine();
@@ -707,6 +709,7 @@ public class ConfigWindow : Window
             ImGui.TableNextRow(); ImGui.TableNextColumn(); ImGui.Text("Activity.Artists[0].Name"); ImGui.TableNextColumn(); ImGui.Text("System.String");
             ImGui.TableNextRow(); ImGui.TableNextColumn(); ImGui.Text("Activity.Album.Name"); ImGui.TableNextColumn(); ImGui.Text("System.String");
             ImGui.TableNextRow(); ImGui.TableNextColumn(); ImGui.Text("Activity.DurationMs"); ImGui.TableNextColumn(); ImGui.Text("System.Int32");
+            ImGui.TableNextRow(); ImGui.TableNextColumn(); ImGui.Text("Activity.ProgressMs"); ImGui.TableNextColumn(); ImGui.Text("System.Int32");
             ImGui.TableNextRow(); ImGui.TableNextColumn(); ImGui.Text("Activity.Popularity"); ImGui.TableNextColumn(); ImGui.Text("System.Int32");
 
             foreach (var property in UpdaterContextProperties)

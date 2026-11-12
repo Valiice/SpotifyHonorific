@@ -14,10 +14,10 @@ public static class TemplateHelper
 
     /// <summary>
     /// True if the rendered title can change over time: rainbow mode animates the
-    /// color, and "Context" is the only time-varying render variable (exact member
+    /// color, and "Context" and "ProgressMs" are the time-varying render variables (exact member
     /// name; Scriban's renamer exposes property names verbatim). False positives
     /// only cause unnecessary re-renders, which is the safe direction.
     /// </summary>
     public static bool IsTimeDependent(ActivityConfig config)
-        => config.RainbowMode || config.TitleTemplate.Contains("Context");
+        => config.RainbowMode || config.TitleTemplate.Contains("Context") || config.TitleTemplate.Contains("ProgressMs");
 }

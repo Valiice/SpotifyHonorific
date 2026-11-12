@@ -47,6 +47,17 @@ public class TemplateHelperIsTimeDependentTests
     }
 
     [Fact]
+    public void IsTimeDependent_TemplateReferencesProgressMs_ReturnsTrue()
+    {
+        var config = new ActivityConfig
+        {
+            TitleTemplate = "{{ Activity.ProgressMs // 1000 }}",
+            RainbowMode = false
+        };
+        TemplateHelper.IsTimeDependent(config).Should().BeTrue();
+    }
+
+    [Fact]
     public void IsTimeDependent_LowercaseContext_ReturnsFalse()
     {
         // Scriban exposes exact member names (renamer: member => member.Name),

@@ -3,4 +3,5 @@ namespace SpotifyHonorific.Updaters;
 public class UpdaterContext
 {
     public double SecsElapsed { get; set; }
+    internal System.DateTimeOffset? TrackStartedAt { get; set; }
 }
