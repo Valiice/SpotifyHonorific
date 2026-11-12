@@ -81,6 +81,7 @@ When writing your Title Template, you can use the following variables:
 | `Activity.Artists` | List | A list of artists on the track. |
 | `Activity.Album.Name` | String | The name of the album. |
 | `Activity.DurationMs` | Int | Total duration of the track in milliseconds. |
+| `Activity.ProgressMs` | Int | How far into the track playback is in milliseconds. |
 | `Activity.Popularity` | Int | The popularity score (0-100). |
 | `Context.SecsElapsed` | Double | Seconds elapsed since the song started/plugin updated. |
 

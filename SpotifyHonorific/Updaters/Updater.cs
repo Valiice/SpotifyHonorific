@@ -496,6 +496,7 @@ public class Updater : IDisposable
 
         if (outcome == PollOutcome.Playing && track != null)
         {
+            _updaterContext.TrackStartedAt = DateTimeOffset.UtcNow - TimeSpan.FromMilliseconds(result!.ProgressMs ?? 0);
             _isMusicPlaying = true;
             _tracksPlayedThisSession.Add(track.Id);
             ProcessCurrentlyPlayingTrack(track);

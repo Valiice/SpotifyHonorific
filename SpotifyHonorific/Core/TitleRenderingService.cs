@@ -37,7 +37,9 @@ public class TitleRenderingService
             return null;
         }
 
-        var title = template.Render(new { Activity = track, Context = context }, member => member.Name);
+        var activity = new Scriban.Runtime.ScriptObject { ["ProgressMs"] = (int?)(System.DateTimeOffset.UtcNow - context.TrackStartedAt)?.TotalMilliseconds };
+        Scriban.Runtime.ScriptObjectExtensions.Import(activity, track, renamer: member => member.Name);
+        var title = template.Render(new { Activity = activity, Context = context }, member => member.Name);
 
         if (title.Length > MAX_TITLE_LENGTH)
         {
